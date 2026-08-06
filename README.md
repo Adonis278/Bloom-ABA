@@ -94,12 +94,18 @@ firebase emulators:start --only functions,auth --project bloom-aba
 npm run dev
 ```
 
-`.env.local` (gitignored) with `VITE_USE_EMULATOR=true` points the client at
-both emulators instead of the live project — copy it if it's missing:
+`.env.development.local` (gitignored) with `VITE_USE_EMULATOR=true` points
+the client at both emulators instead of the live project — create it if it's
+missing:
 
 ```
 VITE_USE_EMULATOR=true
 ```
+
+Use `.env.development.local`, not `.env.local` — Vite loads `.env.local` in
+*every* mode, including `vite build`, so it would leak the emulator host into
+a production bundle. `.env.development.local` only loads for `vite` (dev
+mode), never for `vite build`.
 
 Open `http://localhost:5173`. Paste an assignment, hit Start.
 

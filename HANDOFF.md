@@ -1,4 +1,59 @@
-# Handoff — MVP loop built and verified
+# Handoff — MVP loop built, deployed, and live
+
+**Live URL:** https://bloom-aba.web.app
+
+## Action needed from you — Firebase Auth was never initialized
+
+The live app currently runs, but only because of a client-side fallback (see
+below), not because the project is correctly configured. Confirmed directly
+against Google's Identity Toolkit API:
+
+```
+POST https://identitytoolkit.googleapis.com/v1/accounts:signUp
+→ 400 CONFIGURATION_NOT_FOUND
+```
+
+That's not "Anonymous sign-in is disabled" — it's that Authentication has
+never been turned on for `bloom-aba` at all. This is a one-time console
+action I don't have a safe API path to do myself:
+
+1. [Firebase Console](https://console.firebase.google.com/project/bloom-aba/authentication) → **Authentication** → **Get started**
+2. Enable the **Anonymous** sign-in provider
+
+Takes under a minute. Until you do this, every session runs without a stable
+uid (see below for why that's currently harmless, and why it won't stay
+harmless once logging or prompt-level persistence lands).
+
+## A real bug this caught, not just a config gap
+
+`src/lib/firebase.js`'s `ready` promise originally had no timeout. If
+`signInAnonymously()` fails for *any* reason, the failure was swallowed (per
+hard rule 1 — correct), but `onAuthStateChanged` then never fires with a
+user, so `ready` never resolves. Every `generateStep` call does
+`await ready` first, so the entire app hung on "Reading it." /
+"Still reading." forever — no fallback, no error, just permanently stuck.
+Caught this by actually clicking through the live deployment in a browser,
+not by reading the code.
+
+Fixed: `ready` now always resolves within 4 seconds even if sign-in never
+completes, and `generateStep` works fine unauthenticated (the function
+never checks `req.auth`). Confirmed working live: full loop (Start → step →
+Done → next step) succeeds even with Auth still unconfigured. Once you flip
+the Anonymous toggle above, sign-in will just succeed within its first
+~300ms round trip and the timeout path won't be exercised at all — the fix
+is a safety net for *any* future auth failure, not a workaround for this one.
+
+## Real cold-start number, not an emulator artifact
+
+The number I couldn't honestly claim earlier — first invocation of the newly
+deployed function, in actual production: **1.48s.** Warm requests after
+that: **~0.9s.** Both comfortably inside the 10s target (BR1). This
+confirms the local-emulator slowness noted below really was emulator
+startup overhead, not the real pipeline.
+
+---
+
+
 
 Read `CLAUDE.md` first, then this. Everything below is verified by running it,
 not by reading the code.
@@ -16,9 +71,18 @@ while pending, exactly per hard rule 12) and watched the next step arrive,
 clicked Too big and watched a smaller step replace it. Zero console errors,
 zero warnings beyond normal Vite/React DevTools noise, all three
 `generateStep` calls returned 200. `src/lib/firebase.js` now also connects
-the Auth emulator (only `.env.local` had `VITE_USE_EMULATOR=true`, which is
-gitignored) — previously only Functions was wired to the emulator, so this
-exact browser test wasn't possible before.
+the Auth emulator (`VITE_USE_EMULATOR=true` in a gitignored local env file) —
+previously only Functions was wired to the emulator, so this exact browser
+test wasn't possible before.
+
+**Near-miss caught before the first deploy:** that env file was originally
+named `.env.local`, which Vite loads in *every* mode — including
+`vite build`. A production build run while it existed baked
+`127.0.0.1:9099` (the Auth emulator host) directly into the deployed JS
+bundle; confirmed by grepping the built output before shipping it. Renamed to
+`.env.development.local`, which Vite only loads in dev mode, and rebuilt —
+confirmed the emulator host is gone from `dist/`. If you ever add another
+local-only env file, use the mode-scoped name, not the bare `.local` one.
 
 - `npm run build` succeeds. 320 kB JS / 14.6 kB CSS, fonts self-hosted.
 - Design tokens resolve in built CSS; no font-CDN request in the bundle; no

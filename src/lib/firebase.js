@@ -37,6 +37,8 @@ if (import.meta.env.VITE_USE_EMULATOR === 'true') {
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
 }
 
+const AUTH_TIMEOUT_MS = 4000;
+
 /* Anonymous auth only. No sign-up, no email, no password, no login screen.
    A student lands straight on the entry screen.
 
@@ -45,16 +47,34 @@ if (import.meta.env.VITE_USE_EMULATOR === 'true') {
    at generate time, so `ready` is awaited there instead.
 
    Zero PII, but a stable uid — which is what makes per-student prompt levels
-   and summaries possible without an account. */
+   and summaries possible without an account.
+
+   `ready` ALWAYS resolves — it never rejects and never hangs forever.
+   Found live: if sign-in fails for any reason (misconfigured project,
+   Anonymous provider disabled, network blip), the original version of this
+   code swallowed the error but then waited on onAuthStateChanged forever,
+   since a failed sign-in never fires it. Every generateStep call sat on
+   "Reading it." indefinitely — silently, with no way out. That is a worse
+   failure than showing no uid at all. generateStep doesn't require
+   req.auth, so proceeding unauthenticated after a timeout still works; it
+   just means no stable uid for that session, which costs nothing this
+   milestone since nothing is persisted per-uid yet. */
 export const ready = new Promise((resolve) => {
+  let settled = false;
+  const finish = (user) => {
+    if (settled) return;
+    settled = true;
+    resolve(user ?? null);
+  };
+
   onAuthStateChanged(auth, (user) => {
-    if (user) resolve(user);
+    if (user) finish(user);
   });
   signInAnonymously(auth).catch(() => {
-    /* Swallowed on purpose. There is no error state in this product
-       (hard rule 1). A student never sees a failed sign-in; the caller
-       that actually needs a uid handles the absence quietly. */
+    /* Swallowed on purpose (hard rule 1) — the timeout below is what
+       actually prevents this from becoming a silent hang. */
   });
+  setTimeout(() => finish(null), AUTH_TIMEOUT_MS);
 });
 
 export { auth, httpsCallable };
