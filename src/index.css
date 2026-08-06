@@ -71,3 +71,25 @@
     min-width: 44px;
   }
 }
+
+/* Landing-page-only. A slow, ambient pulse for the floating sign-in widget —
+   deliberately NOT used anywhere in the student tool (Entry/Step), which
+   keeps hard rule 11's one-crossfade-and-nothing-else-moves budget intact.
+   The landing page is a different design register on purpose; see
+   CLAUDE.md "Landing page & account model". Killed globally by the
+   prefers-reduced-motion rule above (animation: none !important). */
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.94;
+  }
+  50% {
+    transform: scale(1.015);
+    opacity: 1;
+  }
+}
+
+.breathing {
+  animation: breathe 3600ms ease-in-out infinite;
+}

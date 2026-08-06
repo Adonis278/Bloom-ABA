@@ -1,3 +1,90 @@
+# Handoff — account model, landing page, My Work (built, NOT yet deployed)
+
+**This section is newer than the "MVP loop" section below it — read this first.**
+The account model changed from anonymous-only to Google sign-in, by explicit
+product decision (see CLAUDE.md "Landing page & account model" for the full
+reasoning and the COPPA/PII tradeoff). New surfaces: `LandingPage.jsx` (Google
+sign-in, breathing floating widget, new-vs-returning welcome), `MyWork.jsx`
+(real history of completed steps + uploaded content), Firebase Storage wired
+in for uploads. Read-aloud (`SpeechSynthesis`, explicit action only) also
+shipped this pass.
+
+**Not deployed yet.** This touches auth, privacy posture, and adds real
+content storage — wanted a full local verification pass before pushing it
+live, given the last deploy already had one real bug slip through
+(the auth-hang issue below). See "What's verified" and "What's NOT verified"
+before deploying.
+
+## What's verified
+
+- **Firestore rules, the real way**: got genuine ID tokens from the Auth
+  emulator for two separate test users, then exercised `profiles/{uid}` and
+  `profiles/{uid}/history` directly. Owner can read/write their own; a
+  different signed-in user is denied; unauthenticated is denied. All three
+  confirmed via raw HTTP against the rules engine itself, not inferred from
+  reading the rules file.
+- **Storage rules, through the actual SDK path** — this one had a real scare.
+  A raw-REST cross-user upload test initially showed success (403 expected,
+  got 200), which looked like a live security bug. Re-tested through
+  `uploadBytes()` from `firebase/storage` — the exact function
+  `src/lib/uploads.js` actually calls — and it was correctly denied
+  (`storage/unauthorized`). The raw GCS-compatible JSON API bypasses Firebase
+  Security Rules enforcement in a way the client SDK doesn't; the earlier
+  result was a testing-method artifact, not a bug in the app. Don't trust
+  raw REST Storage tests as a stand-in for the SDK path again — verify
+  through the SDK first.
+- **New-vs-returning detection**: called the exact read-then-conditional-write
+  pattern from `ensureProfile()` twice against the same fresh uid on the
+  emulator. First call: `isNew: true`. Second call, same uid: `isNew: false`.
+- **Landing page layout bug, found and fixed**: on a narrow/short viewport,
+  the hero heading (no smaller mobile size, one fixed large `text-[2.6rem]`)
+  wrapped to 4 lines and ran under the fixed-position floating widget,
+  covering the last line of body copy. Root cause wasn't padding — a
+  `position: fixed` widget doesn't respond to document flow or padding at
+  all, so no amount of `pb-*` fixes an overlap once content is genuinely
+  taller than the safe zone above it. Fixed by adding real responsive type
+  scaling (`text-[1.9rem] sm:text-[2.6rem] md:text-[3.2rem]`) so the hero
+  reliably fits above the widget regardless of viewport. Confirmed via
+  `getBoundingClientRect()` on both elements post-fix: 149px real clearance.
+- Full constraint sweep clean on all new files: no red, no exclamation marks
+  in copy, no spinners, no analytics imports, no streak/points language, no
+  emulator host leaked into the production build.
+- `npm run build` passes. Bundle grew ~320KB → ~664KB (gzipped ~85KB →
+  ~171KB) from adding the Firestore and Storage SDKs — real, worth knowing,
+  not code-split yet.
+
+## What's NOT verified — the actual Google OAuth popup, end to end in a UI
+
+The Auth emulator mocks Google's popup with its own local account picker (no
+real Google credentials involved, safe to automate) — but in this specific
+browser-automation harness, `signInWithPopup` opened that mock UI as an
+in-place navigation of the same tab rather than a true child window. The
+emulator's popup protocol depends on a live opener-window reference to
+`postMessage` the result back, so it failed with `Auth Emulator Internal
+Error: No matching frame` once the "popup" had nowhere to report to. This is
+a limitation of the test harness, not a diagnosed app bug — but it's also not
+proof the button works from a real click in a real browser. **Click through
+this once yourself in an actual browser before demoing**: Sign in with
+Google → new-user welcome → Entry appears with the "My work" link → complete
+a step → open My work → confirm it's listed → try an upload → reload the
+page → confirm "Welcome back, {name}" appears automatically with no click
+needed (that's the "remember device" behavior).
+
+## Two things to decide before deploying
+
+1. **PII minimization is a judgment call I made, not you.** `profiles/{uid}`
+   stores only a first name + timestamps — never email or photo. That was a
+   reasonable default given BRD.md's COPPA/PII constraint, but it's your
+   product; revisit it if you want more (or less) stored.
+2. **Firebase Auth's Google provider** — confirmed enabled and the Auth
+   service itself is now initialized on `bloom-aba` (anonymous auth now
+   correctly returns `ADMIN_ONLY_OPERATION` instead of the old
+   `CONFIGURATION_NOT_FOUND`). Not independently confirmed which exact OAuth
+   client / consent-screen config is behind it — that's on your side of the
+   console, not something I set up.
+
+---
+
 # Handoff — MVP loop built, deployed, and live
 
 **Live URL:** https://bloom-aba.web.app

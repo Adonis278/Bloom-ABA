@@ -1,6 +1,15 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, connectAuthEmulator } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+  connectAuthEmulator,
+} from 'firebase/auth';
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/functions';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 
 /* DELIBERATELY NOT IMPORTED — do not add these back.
 
@@ -10,10 +19,8 @@ import { getFunctions, httpsCallable, connectFunctionsEmulator } from 'firebase/
 
    The Firebase console's default snippet includes getAnalytics. It was
    removed on purpose. measurementId is omitted from the config below for
-   the same reason.
-
-   Firestore is also not imported yet: nothing is persisted in this session,
-   and an unused import would ship dead weight to a phone browser. */
+   the same reason. This holds regardless of the account model — sign-in
+   provider is a separate question from third-party tracking. */
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -25,56 +32,39 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 
+export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 export const functions = getFunctions(app, 'us-central1');
 
 if (import.meta.env.VITE_USE_EMULATOR === 'true') {
-  // Auth too, not just Functions — otherwise local runs still sign in
-  // against the real project (which may or may not have Anonymous enabled)
-  // while generateStep hits the local emulator. Both or neither.
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectStorageEmulator(storage, '127.0.0.1', 9199);
 }
 
-const AUTH_TIMEOUT_MS = 4000;
+/* Google sign-in replaces anonymous auth as of this build. Every user signs
+   in; Firebase Auth's default web persistence (IndexedDB, survives reloads
+   and browser restarts on the same device) is what gives "remember this
+   device" for free — no custom device-fingerprinting needed. A returning
+   session restores via onAuthStateChanged without the student doing
+   anything; a new device sees LandingPage.jsx and its sign-in widget.
 
-/* Anonymous auth only. No sign-up, no email, no password, no login screen.
-   A student lands straight on the entry screen.
+   PII minimization: we only ever read displayName off the Google profile
+   (for the "Welcome back, {name}" greeting) — never email or photo. See
+   CLAUDE.md for the COPPA/PII rationale; this is a deliberate scope limit,
+   not an oversight. */
+const googleProvider = new GoogleAuthProvider();
 
-   This is fired at module load and deliberately NOT awaited by the UI: the
-   entry screen must be on screen immediately. The uid is only needed later,
-   at generate time, so `ready` is awaited there instead.
+export async function signInWithGoogle() {
+  const { user } = await signInWithPopup(auth, googleProvider);
+  return user;
+}
 
-   Zero PII, but a stable uid — which is what makes per-student prompt levels
-   and summaries possible without an account.
+export async function signOutUser() {
+  await signOut(auth);
+}
 
-   `ready` ALWAYS resolves — it never rejects and never hangs forever.
-   Found live: if sign-in fails for any reason (misconfigured project,
-   Anonymous provider disabled, network blip), the original version of this
-   code swallowed the error but then waited on onAuthStateChanged forever,
-   since a failed sign-in never fires it. Every generateStep call sat on
-   "Reading it." indefinitely — silently, with no way out. That is a worse
-   failure than showing no uid at all. generateStep doesn't require
-   req.auth, so proceeding unauthenticated after a timeout still works; it
-   just means no stable uid for that session, which costs nothing this
-   milestone since nothing is persisted per-uid yet. */
-export const ready = new Promise((resolve) => {
-  let settled = false;
-  const finish = (user) => {
-    if (settled) return;
-    settled = true;
-    resolve(user ?? null);
-  };
-
-  onAuthStateChanged(auth, (user) => {
-    if (user) finish(user);
-  });
-  signInAnonymously(auth).catch(() => {
-    /* Swallowed on purpose (hard rule 1) — the timeout below is what
-       actually prevents this from becoming a silent hang. */
-  });
-  setTimeout(() => finish(null), AUTH_TIMEOUT_MS);
-});
-
-export { auth, httpsCallable };
+export { onAuthStateChanged, httpsCallable };

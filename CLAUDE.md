@@ -7,11 +7,15 @@ demand goes **down**, never up.
 Full context: `docs/BRD.md`, `docs/DESIGN.md`, `docs/spec.md`. Read them before
 making architectural decisions.
 
-**Stack:** React (Vite) + Tailwind + Firebase (Auth, Firestore, Functions, Hosting).
-**App name:** Bloom. **Firebase project:** `bloom-aba`. Auth is **anonymous
-only** — no sign-up, no email, no login screen. A student lands straight on
-the entry screen. "Bloom" is browser-tab identity only — it does not appear
-as a logo or chrome on the student surface (hard rule 3).
+**Stack:** React (Vite) + Tailwind + Firebase (Auth, Firestore, Functions, Hosting,
+Storage). **App name:** Bloom. **Firebase project:** `bloom-aba`.
+
+**Auth changed from anonymous-only to Google sign-in, deliberately, mid-project.**
+Every user now signs in with Google before reaching the tool. This is a real
+departure from BR1's original "no account" framing — recorded here as a decision,
+not left as a silent contradiction between the docs and the app. See "Landing page
+& account model" below for the full reasoning, the privacy tradeoff, and exactly
+what's still scoped away from the student tool despite this change.
 
 ---
 
@@ -24,9 +28,16 @@ stop and ask.
    didn't work is quietly replaced by a smaller one.
 2. **No exclamation marks, no praise, no encouragement** in any UI copy or any
    AI-generated step. Flat, plain tone.
-3. **One focal element on screen at all times.** No nav bar, no sidebar, no logo,
-   no persistent chrome, no dashboard for the student.
-4. **Never show a list of steps.** One step, then the next. The previous step is gone.
+3. **One focal element on screen at all times, on Entry and Step.** No nav bar,
+   no sidebar, no logo, no persistent chrome, no dashboard for the student.
+   Two scoped exceptions, both deliberate: LandingPage.jsx (a different design
+   register entirely — see below) and a single small "My work" text link on
+   Entry only, never on Step. The in-task screen is untouched.
+4. **Never show a list of steps — on Entry and Step.** One step, then the next.
+   The previous step is gone. Scoped exception: MyWork.jsx, a separate screen the
+   student opts into via the Entry link, showing their real history of completed
+   steps and uploads. This was an explicit product decision (student asked for
+   it directly), not a drift — see below.
 5. **Nothing auto-plays.** No sound, no motion, no speech without explicit user action.
 6. **No streaks, points, badges, leaderboards, or progress percentages.**
 7. **Log keystroke TIMING only.** Never log, store, or transmit typed characters.
@@ -138,6 +149,57 @@ rather than gesturing at it. `prefers-reduced-motion` turns both into instant sw
 Worst realistic wait if the chain falls all the way through is ~13s, so a second
 line at ~7s ("Still reading.") is reasonable. One line is the floor; anything
 that spins, pulses, or fills is not.
+
+## Landing page & account model
+
+This app started zero-account (BR1, hard rule 3 as originally written). That
+changed by explicit product decision: every user now signs in with Google
+before reaching the tool, with the device remembered afterward via Firebase
+Auth's normal persisted session — no custom fingerprinting, just the SDK's
+default local persistence. A returning session auto-restores with no click
+needed. This was raised as a conflict against the hard rules before building
+it, and reaffirmed with a specific implementation detail ("remember device,
+welcome back"), so it's built as a real decision, not a quiet drift.
+
+**The design-register boundary is the load-bearing idea.** `LandingPage.jsx`
+is allowed to look like a normal marketing page — bigger type, a floating
+"breathing" widget with a slow ambient pulse, the job of making a first
+impression and getting someone to act. `Entry.jsx` and `Step.jsx` are
+untouched: still one focal element, still no ambient motion, still the
+one-crossfade budget. What still holds on the landing page regardless: no
+red, no exclamation marks, no sound that plays without an explicit action —
+those protect this population everywhere, not just mid-task. What's scoped
+out there specifically: one-focal-element, no-list, the motion budget,
+no-spinner — those are about the moment of doing the work, and the landing
+page isn't that moment.
+
+**PII minimization.** BRD.md's own constraints flag COPPA/FERPA exposure for
+this user base ("no PII, no content logging") — pulling a minor's real name
+and email via Google OAuth is a materially different privacy posture than
+anonymous auth was. Mitigation: `profiles/{uid}` stores only a first name
+(parsed from `displayName`, used solely for "Welcome back, {name}") and
+timestamps. Email and photo URL are never read off the Google profile, never
+stored. This is a deliberate scope limit — flagged to the user once, not
+resolved further; a real compliance review before any wider release should
+revisit it.
+
+**"My work" (`MyWork.jsx`)** is the real history list the student asked for —
+`profiles/{uid}/history/{entryId}`, holding both completed steps and uploaded
+files, readable and writable only by the owning uid (`firestore.rules`,
+`storage.rules`). This is a genuinely different privacy posture than
+`summaries/{uid}` (DESIGN.md section 2): summaries stay aggregate-only and
+adult-readable; history holds real content and has no adult read path
+anywhere. Do not conflate the two collections, and do not give any adult
+surface access to `profiles/{uid}/history`.
+
+**Read-aloud.** Step.jsx has a "Listen" button using the browser's
+`SpeechSynthesis` API — no cloud call, no key, no cost. Explicit user action
+only, never auto-plays (hard rule 5). Speech is cancelled on Done, Too big,
+and any step change, so it can never narrate a step the student already left.
+This is the read-the-step-aloud slice of spec.md F24; word-synced
+highlighting is the fuller scope and isn't built.
+
+---
 
 ## Verification
 
