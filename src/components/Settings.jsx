@@ -4,21 +4,21 @@ export default function Settings({ settings, onChange, onClose }) {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center px-6 py-10">
+    <div className="min-h-screen bg-bg flex flex-col items-center px-6 py-14">
       <div className="w-full max-w-md">
         <button
           type="button"
           onClick={onClose}
-          className="text-quiet text-sm font-chrome underline mb-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          className="text-quiet text-sm font-chrome underline mb-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
         >
           back
         </button>
 
-        <h1 className="text-ink text-xl font-chrome mb-6">Settings</h1>
+        <h1 className="text-ink font-display text-2xl mb-8">Settings</h1>
 
-        <fieldset className="mb-6">
-          <legend className="text-ink font-chrome text-base mb-2">How steps are made</legend>
-          <label className="flex items-center gap-2 text-ink font-chrome text-sm mb-2">
+        <fieldset className="mb-6 bg-surface border border-hairline rounded-2xl px-5 py-4">
+          <legend className="text-ink font-body text-base mb-3 px-1">How steps are made</legend>
+          <label className="flex items-center gap-2 text-ink font-body text-sm mb-3">
             <input
               type="checkbox"
               checked={settings.aiRules.smallerSteps}
@@ -29,7 +29,7 @@ export default function Settings({ settings, onChange, onClose }) {
             />
             Make steps smaller
           </label>
-          <label className="flex items-center gap-2 text-ink font-chrome text-sm">
+          <label className="flex items-center gap-2 text-ink font-body text-sm">
             <input
               type="checkbox"
               checked={settings.aiRules.readAloud}
@@ -42,8 +42,8 @@ export default function Settings({ settings, onChange, onClose }) {
           </label>
         </fieldset>
 
-        <fieldset className="mb-6">
-          <legend className="text-ink font-chrome text-base mb-2">Text size</legend>
+        <fieldset className="mb-6 bg-surface border border-hairline rounded-2xl px-5 py-4">
+          <legend className="text-ink font-body text-base mb-3 px-1">Text size</legend>
           <div className="flex gap-2">
             {['standard', 'large', 'largest'].map((size) => (
               <button
@@ -51,10 +51,10 @@ export default function Settings({ settings, onChange, onClose }) {
                 type="button"
                 onClick={() => update({ textSize: size })}
                 aria-pressed={settings.textSize === size}
-                className={`px-3 py-2 rounded-md border font-chrome text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                className={`px-3 py-2 rounded-full border font-body text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                   settings.textSize === size
-                    ? 'border-ink text-ink'
-                    : 'border-ink/20 text-quiet'
+                    ? 'border-ink text-ink bg-bg'
+                    : 'border-hairline text-quiet'
                 }`}
               >
                 {size}
@@ -63,9 +63,9 @@ export default function Settings({ settings, onChange, onClose }) {
           </div>
         </fieldset>
 
-        <fieldset>
-          <legend className="text-ink font-chrome text-base mb-2">A little reminder for yourself</legend>
-          <label className="flex items-center gap-2 text-ink font-chrome text-sm mb-2">
+        <fieldset className="bg-surface border border-hairline rounded-2xl px-5 py-4">
+          <legend className="text-ink font-body text-base mb-3 px-1">A little reminder for yourself</legend>
+          <label className="flex items-center gap-2 text-ink font-body text-sm mb-3">
             <input
               type="checkbox"
               checked={settings.reward.enabled}
@@ -84,7 +84,7 @@ export default function Settings({ settings, onChange, onClose }) {
                 update({ reward: { ...settings.reward, message: event.target.value } })
               }
               placeholder="e.g. You're doing this."
-              className="w-full border border-ink/20 rounded-md px-3 py-2 text-ink font-chrome text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="w-full bg-bg border border-hairline rounded-xl px-3 py-2 text-ink font-body text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent"
             />
           )}
         </fieldset>

@@ -32,19 +32,19 @@ export default function EntryForm({ onSubmit }) {
   }
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6">
+    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 py-16">
       <form onSubmit={handleSubmit} className="w-full max-w-md">
-        <label htmlFor="assignment-input" className="block text-ink text-lg mb-3 font-chrome">
+        <label htmlFor="assignment-input" className="block text-ink font-display text-2xl mb-5">
           What do you need to do?
         </label>
-        <div className="flex items-center gap-2 border border-ink/20 rounded-md px-3 py-2 focus-within:ring-2 focus-within:ring-accent">
+        <div className="flex items-center gap-2 bg-surface border border-hairline rounded-2xl px-4 py-3 focus-within:ring-2 focus-within:ring-accent">
           <input
             id="assignment-input"
             type="text"
             value={value}
             onChange={(event) => setValue(event.target.value)}
             placeholder="Paste or type your assignment"
-            className="flex-1 bg-transparent outline-none text-ink font-chrome text-base py-1"
+            className="flex-1 bg-transparent outline-none text-ink font-body text-base py-1"
             autoFocus
           />
           <span className="text-quiet" title="Voice input (coming soon)">
@@ -57,13 +57,13 @@ export default function EntryForm({ onSubmit }) {
 
         <button
           type="submit"
-          className="mt-4 w-full bg-accent text-white font-chrome text-base py-3 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent"
+          className="mt-5 w-full min-h-[52px] bg-accent text-white font-chrome text-base px-8 rounded-[22px_28px_20px_26px] motion-safe:transition-transform motion-safe:duration-150 motion-safe:ease-out motion-safe:active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent"
         >
           Get my first step
         </button>
       </form>
 
-      <div className="w-full max-w-md mt-6 text-sm text-quiet font-chrome">
+      <div className="w-full max-w-md mt-8 text-sm text-quiet font-body">
         <p>
           We only use what you type to make your steps. Nothing is shared without you saying so.{' '}
           <button

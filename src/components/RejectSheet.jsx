@@ -32,14 +32,14 @@ export default function RejectSheet({ onChoose, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-label="What's wrong with this step?"
-        className="relative bg-bg w-full max-w-md rounded-t-xl px-6 py-6 flex flex-col gap-3"
+        className="relative bg-surface w-full max-w-md rounded-t-[28px] px-6 py-6 flex flex-col gap-3"
       >
         {REASONS.map((reason) => (
           <button
             key={reason.key}
             type="button"
             onClick={() => onChoose(reason.key)}
-            className="w-full text-left border border-ink/20 rounded-md px-4 py-3 text-ink font-chrome text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="w-full text-left bg-bg border border-hairline rounded-2xl px-4 py-3 text-ink font-body text-base focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {reason.label}
           </button>

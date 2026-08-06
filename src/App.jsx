@@ -126,6 +126,7 @@ export default function App() {
       {state.view === 'step' && state.currentStep && (
         <>
           <StepView
+            stepId={state.currentStep.stepId}
             stepText={state.currentStep.stepText}
             pastCount={pastCount}
             suggestBreak={state.currentStep.suggestBreak}
