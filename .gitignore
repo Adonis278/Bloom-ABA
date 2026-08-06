@@ -1,0 +1,23 @@
+node_modules/
+dist/
+.vite/
+
+# Local overrides
+.env.local
+.env.*.local
+
+# Firebase Functions secrets used by the local emulator.
+# NEVER commit this — it holds the NVIDIA and Anthropic keys in plaintext.
+functions/.secret.local
+functions/node_modules/
+
+# Firebase tooling
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

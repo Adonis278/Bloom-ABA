@@ -1,0 +1,72 @@
+rules_version = '2';
+
+/* ---------------------------------------------------------------------------
+   DESIGN.md section 3, corrected into valid syntax.
+
+   Three fixes against the version in the doc:
+     1. hasLiveShare() was declared outside the service block, which does not
+        parse. Moved inside.
+     2. Its get(...) calls were written as literal ellipses. Written out.
+     3. `resource.data.uid` is null on create, so the session create rule
+        would always deny. Split create onto request.resource.data.uid.
+
+   Nothing writes Firestore yet — no collection in this file is touched by the
+   MVP loop. These ship now because deploying open or empty rules while a
+   Firestore instance exists is worse than deploying the real ones early.
+
+   The load-bearing claim: adults never read a student's collections. They read
+   summaries/{uid} only, which holds derived aggregates written by a Cloud
+   Function and contains no assignment text, no step text, no keystroke
+   content. That is enforced here at the database layer, not in UI code — a bug
+   in the dashboard cannot leak an assignment, because the data is not
+   reachable. Adults have no write path anywhere.
+--------------------------------------------------------------------------- */
+
+service cloud.firestore {
+  match /databases/{db}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function shareIsLive(ownerUid) {
+      return signedIn()
+        && exists(/databases/$(db)/documents/shares/$(request.auth.uid))
+        && get(/databases/$(db)/documents/shares/$(request.auth.uid)).data.ownerUid == ownerUid
+        && get(/databases/$(db)/documents/shares/$(request.auth.uid)).data.revokedAt == null;
+    }
+
+    // The student owns everything under their uid.
+    match /profiles/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    match /sessions/{sid} {
+      allow read, update, delete: if signedIn() && request.auth.uid == resource.data.uid;
+      allow create: if signedIn() && request.auth.uid == request.resource.data.uid;
+
+      match /steps/{stepId} {
+        allow read, write: if signedIn()
+          && request.auth.uid == get(/databases/$(db)/documents/sessions/$(sid)).data.uid;
+      }
+    }
+
+    // Aggregates only. The student reads their own; the holder of a live share
+    // code reads it too. Written by Cloud Function (Admin SDK) exclusively.
+    match /summaries/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || shareIsLive(uid));
+      allow write: if false;
+    }
+
+    match /shares/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid == request.resource.data.ownerUid;
+      allow update, delete: if signedIn() && request.auth.uid == resource.data.ownerUid;
+    }
+
+    // Deny by default. Anything not matched above is unreachable.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

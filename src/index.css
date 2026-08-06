@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Design tokens — DESIGN.md section 9.
+   Tints swap variables; components never change.
+   Never hardcode a color anywhere else in this project.
+
+   Contrast target is 10-14:1 for body text, never 21:1. Maximum contrast
+   causes halation and visual stress for dyslexic readers. Do not "improve"
+   these values toward pure black on pure white.
+--------------------------------------------------------------------------- */
+
+:root        { --paper:221 225 219; --card:241 243 239; --ink:34 39 34;
+               --muted:83 90 83;   --line:195 202 191; --warm:122 106 79; }
+
+[data-tint="sand"]  { --paper:227 223 214; --card:245 242 236; }
+[data-tint="mist"]  { --paper:217 223 226; --card:238 242 244; }
+[data-tint="rose"]  { --paper:228 220 220; --card:245 240 240; }
+
+/* Dark is #2A2E2B, never #000 — pure black with light text produces
+   halation on OLED. */
+[data-theme="dark"] { --paper:42 46 43;  --card:53 58 54; --ink:232 235 231;
+                      --muted:163 170 163; --line:69 75 70; --warm:179 155 116; }
+
+/* Motion budget: one 450ms crossfade when a step is replaced.
+   Nothing else animates, ever. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+@layer base {
+  html {
+    /* Student text controls will map a scale multiplier onto this root size,
+       so every size scales together. Not wired up yet. */
+    font-size: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    margin: 0;
+    min-height: 100dvh;
+  }
+
+  /* Keyboard complete: every action reachable by Tab, visible 2px focus ring.
+     Focus is signalled by weight and outline, never by hue alone. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--ink));
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: rgb(var(--line));
+    color: rgb(var(--ink));
+  }
+}
+
+@layer utilities {
+  /* The one lit surface on the page. */
+  .card-lit {
+    @apply bg-card shadow-lit;
+    border-radius: 14px;
+  }
+
+  /* Touch targets are never below 44px. */
+  .tap {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
