@@ -1,9 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Crossfade from '../components/Crossfade.jsx';
 
 const READING_LINE = 'Reading it.';
 const STILL_READING_LINE = 'Still reading.';
 const SECOND_LINE_DELAY_MS = 7000;
+
+/* Browser TTS, not a cloud call — no key, no cost, no network dependency.
+   spec.md F24 / accessibility spec: read-aloud must be explicit-action only,
+   never auto-play (hard rule 5, N1). There is no synced word highlighting
+   here — that's the fuller F24 scope; this is the read-the-step-aloud MVP
+   of it. */
+const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
 /* The lit card. One step, two buttons: [Done] [Too big].
 
@@ -21,6 +28,9 @@ const SECOND_LINE_DELAY_MS = 7000;
 export default function Step({ step, pending, onDone, onTooBig }) {
   const isFirstLoad = pending && !step;
   const [showSecondLine, setShowSecondLine] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const stepRef = useRef(step);
+  stepRef.current = step;
 
   useEffect(() => {
     if (!isFirstLoad) {
@@ -30,6 +40,34 @@ export default function Step({ step, pending, onDone, onTooBig }) {
     const t = setTimeout(() => setShowSecondLine(true), SECOND_LINE_DELAY_MS);
     return () => clearTimeout(t);
   }, [isFirstLoad]);
+
+  // Never let read-aloud narrate a step the student has already left —
+  // stop speaking the moment the step changes, whichever direction.
+  useEffect(() => {
+    return () => {
+      if (speechSupported) window.speechSynthesis.cancel();
+    };
+  }, [step]);
+
+  function toggleReadAloud() {
+    if (!speechSupported) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(stepRef.current);
+    utterance.onend = () => setSpeaking(false);
+    utterance.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+    setSpeaking(true);
+  }
+
+  function stopSpeakingThen(action) {
+    if (speechSupported) window.speechSynthesis.cancel();
+    setSpeaking(false);
+    action();
+  }
 
   const phase = isFirstLoad ? (showSecondLine ? 'reading-2' : 'reading-1') : step;
 
@@ -48,10 +86,10 @@ export default function Step({ step, pending, onDone, onTooBig }) {
           </Crossfade>
         </div>
 
-        <div className="mt-10 flex gap-3">
+        <div className="mt-10 flex flex-wrap gap-3">
           <button
             type="button"
-            onClick={onDone}
+            onClick={() => stopSpeakingThen(onDone)}
             disabled={pending}
             className="tap rounded-lg border border-line px-5 text-[0.9375rem] font-bold disabled:opacity-40"
           >
@@ -59,12 +97,23 @@ export default function Step({ step, pending, onDone, onTooBig }) {
           </button>
           <button
             type="button"
-            onClick={onTooBig}
+            onClick={() => stopSpeakingThen(onTooBig)}
             disabled={pending}
             className="tap rounded-lg border border-line px-5 text-[0.9375rem] disabled:opacity-40"
           >
             Too big
           </button>
+          {speechSupported && (
+            <button
+              type="button"
+              onClick={toggleReadAloud}
+              disabled={pending}
+              aria-pressed={speaking}
+              className="tap rounded-lg border border-line px-5 text-[0.9375rem] disabled:opacity-40"
+            >
+              {speaking ? 'Stop' : 'Listen'}
+            </button>
+          )}
         </div>
       </div>
     </main>
