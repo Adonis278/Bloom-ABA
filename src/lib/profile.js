@@ -1,38 +1,66 @@
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  addDoc,
+  collection,
+  query,
+  orderBy,
+  getDocs,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { db } from './firebase.js';
 
-/* profiles/{uid} — new-vs-returning detection and the "Welcome back" name.
+/* profiles/{uid} — uid is the AUTHENTICATED ADULT's Firebase Auth uid (the
+   parent/teacher who signed in with Google). This document holds nothing
+   about the adult at all — not even a name. The Google account is purely a
+   device-trust / authentication mechanism now; the adult is never shown or
+   stored anywhere in this app. See CLAUDE.md "Kindergarten & the
+   adult-authenticates, child-selects model" for the full reasoning.
 
-   PII minimization (see CLAUDE.md): we store only a first name derived from
-   the Google profile at sign-in, plus timestamps. Never email, never photo,
-   never the full name. The student's first name is the only thing shown
-   back to them ("Welcome back, Alex") — nothing here is shared with any
-   adult; this is a separate document from summaries/{uid} (DESIGN.md
-   section 2), which is the only thing an adult can ever read. */
+   profiles/{uid}/children/{childId} — the actual students. A single Google
+   account can have several: a parent with more than one kid, a teacher with
+   a shared classroom device. Selecting a child is a UI action, not a
+   security boundary — every child under one adult account shares that
+   adult's Firestore security scope (firestore.rules still checks only
+   request.auth.uid == uid). This is a deliberate simplification: it avoids
+   building a second, parallel identity/security system under time
+   pressure, at the cost of siblings on the same account technically being
+   able to read each other's history if they inspected requests directly.
+   Acceptable for this use case (a shared family or classroom device); would
+   need real per-child auth if this became a service where children access
+   the tool independently of the adult's session. */
 
-function firstNameFrom(user) {
-  const full = user.displayName?.trim();
-  if (!full) return null;
-  return full.split(/\s+/)[0];
+export async function ensureAdultProfile(uid) {
+  const ref = doc(db, 'profiles', uid);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) {
+    await setDoc(ref, { createdAt: serverTimestamp(), lastSeenAt: serverTimestamp() });
+  } else {
+    await setDoc(ref, { lastSeenAt: serverTimestamp() }, { merge: true });
+  }
 }
 
-/* Returns { isNew, firstName }. Creates the profile doc on first sign-in;
-   touches lastSeenAt on every subsequent one. One read + at most one write
-   per session, not per screen. */
-export async function ensureProfile(user) {
-  const ref = doc(db, 'profiles', user.uid);
-  const snap = await getDoc(ref);
-  const firstName = firstNameFrom(user);
+export async function listChildren(uid) {
+  const q = query(collection(db, 'profiles', uid, 'children'), orderBy('createdAt', 'asc'));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
 
-  if (snap.exists()) {
-    await setDoc(ref, { lastSeenAt: serverTimestamp() }, { merge: true });
-    return { isNew: false, firstName: firstName ?? snap.data().firstName ?? null };
-  }
-
-  await setDoc(ref, {
-    firstName,
+export async function createChild(uid, { name, avatar }) {
+  const ref = await addDoc(collection(db, 'profiles', uid, 'children'), {
+    name: name?.trim() || null,
+    avatar: avatar || null,
     createdAt: serverTimestamp(),
     lastSeenAt: serverTimestamp(),
   });
-  return { isNew: true, firstName };
+  return ref.id;
+}
+
+export async function touchChild(uid, childId) {
+  await setDoc(
+    doc(db, 'profiles', uid, 'children', childId),
+    { lastSeenAt: serverTimestamp() },
+    { merge: true },
+  );
 }

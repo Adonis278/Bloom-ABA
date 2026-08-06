@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { auth, onAuthStateChanged, signInWithGoogle } from './lib/firebase.js';
-import { ensureProfile } from './lib/profile.js';
+import { ensureAdultProfile, listChildren, createChild, touchChild } from './lib/profile.js';
 import { addHistoryEntry } from './lib/history.js';
 import LandingPage from './screens/LandingPage.jsx';
+import ChildPicker from './screens/ChildPicker.jsx';
 import Entry from './screens/Entry.jsx';
 import Step from './screens/Step.jsx';
 import MyWork from './screens/MyWork.jsx';
@@ -10,22 +11,29 @@ import { generateStep } from './lib/generateStep.js';
 
 const MAX_PROMPT_LEVEL = 4;
 const FALLBACK_STEP = 'Open the document you are working on.';
-
-// New users get a slightly longer welcome beat than returning ones — there's
-// more being said ("Welcome" vs "Welcome back") and less reason to rush it.
 const WELCOME_DELAY_NEW_MS = 1600;
 const WELCOME_DELAY_RETURNING_MS = 1100;
 
-/* Screen state + step engine. `authUser` drives everything above the task
-   loop: undefined while Firebase checks the persisted session, null once
-   confirmed signed out, a User once signed in — by either an explicit
-   click on LandingPage or a silent auto-restore of a remembered device.
-   Either way the same effect below runs ensureProfile + the welcome timer,
-   so "Welcome back, {name}" fires identically regardless of which path got
-   the student there. */
+/* Two-layer identity, driving the screen selection below:
+
+     authUser   — the adult (parent/teacher) who signed in with Google.
+                  Pure device-trust/authentication. Never shown, never
+                  stored beyond a bare uid — see profile.js.
+     activeChild — the actual student using the tool right now. Selected
+                  from (or added to) the list of children under authUser's
+                  account via ChildPicker. A UI concept, not a separate
+                  Firebase Auth identity — see CLAUDE.md "Kindergarten &
+                  the adult-authenticates, child-selects model".
+
+   Screen order: authUser resolving -> LandingPage (sign in) -> ChildPicker
+   (who's using it) -> a brief welcome beat -> Entry/Step/MyWork, keyed off
+   activeChild, not authUser. */
 export default function App() {
   const [authUser, setAuthUser] = useState(undefined);
-  const [welcome, setWelcome] = useState(null);
+  const [children, setChildren] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [activeChild, setActiveChild] = useState(null);
+  const [justCreated, setJustCreated] = useState(false);
   const [entered, setEntered] = useState(false);
   const [view, setView] = useState('task'); // 'task' | 'myWork'
 
@@ -33,8 +41,10 @@ export default function App() {
     return onAuthStateChanged(auth, (user) => {
       setAuthUser(user ?? null);
       if (!user) {
-        setWelcome(null);
+        setChildren(null);
+        setActiveChild(null);
         setEntered(false);
+        setShowAddForm(false);
       }
     });
   }, []);
@@ -43,19 +53,42 @@ export default function App() {
     if (!authUser) return undefined;
     let cancelled = false;
 
-    ensureProfile(authUser).then(({ isNew, firstName }) => {
-      if (cancelled) return;
-      setWelcome({ isNew, firstName });
-      const delay = isNew ? WELCOME_DELAY_NEW_MS : WELCOME_DELAY_RETURNING_MS;
-      setTimeout(() => {
-        if (!cancelled) setEntered(true);
-      }, delay);
-    });
+    ensureAdultProfile(authUser.uid)
+      .then(() => listChildren(authUser.uid))
+      .then((list) => {
+        if (cancelled) return;
+        setChildren(list);
+        if (list.length === 1) {
+          setActiveChild(list[0]);
+          touchChild(authUser.uid, list[0].id).catch(() => {});
+        }
+      });
 
     return () => {
       cancelled = true;
     };
   }, [authUser]);
+
+  useEffect(() => {
+    if (!activeChild) return undefined;
+    const delay = justCreated ? WELCOME_DELAY_NEW_MS : WELCOME_DELAY_RETURNING_MS;
+    const t = setTimeout(() => setEntered(true), delay);
+    return () => clearTimeout(t);
+  }, [activeChild, justCreated]);
+
+  function handlePickChild(child) {
+    setJustCreated(false);
+    setEntered(false);
+    setActiveChild(child);
+    touchChild(authUser.uid, child.id).catch(() => {});
+  }
+
+  async function handleAddChild({ name, avatar }) {
+    const id = await createChild(authUser.uid, { name, avatar });
+    setJustCreated(true);
+    setEntered(false);
+    setActiveChild({ id, name: name?.trim() || null, avatar });
+  }
 
   const [assignment, setAssignment] = useState(null);
   const [step, setStep] = useState(null);
@@ -75,11 +108,9 @@ export default function App() {
       });
       setStep(next);
     } catch {
-      // Hard rule 1: no error state. If the callable fails end to end
-      // (network down, cold-start timeout), fall back to a step that is
-      // always safe to show — core.js already guarantees this for every
-      // failure *inside* the function; this covers the request never
-      // completing at all.
+      // Hard rule 1: no error state. core.js already guarantees a usable
+      // step for every failure *inside* the function; this covers the
+      // request never completing at all.
       setStep(FALLBACK_STEP);
     } finally {
       setPending(false);
@@ -94,8 +125,8 @@ export default function App() {
   function handleDone() {
     const done = step ? [...completedSteps, step] : completedSteps;
     setCompletedSteps(done);
-    if (authUser && step) {
-      addHistoryEntry(authUser.uid, {
+    if (authUser && activeChild && step) {
+      addHistoryEntry(authUser.uid, activeChild.id, {
         type: 'step',
         text: step,
         assignmentText: assignment,
@@ -117,12 +148,43 @@ export default function App() {
     return <main className="min-h-dvh bg-paper" />;
   }
 
-  if (!authUser || !entered) {
-    return <LandingPage signedIn={!!authUser} welcome={welcome} onSignIn={signInWithGoogle} />;
+  if (!authUser) {
+    return <LandingPage onSignIn={signInWithGoogle} />;
+  }
+
+  if (!activeChild) {
+    return (
+      <ChildPicker
+        children={children}
+        showAddForm={showAddForm || (children !== null && children.length === 0)}
+        onPick={handlePickChild}
+        onAdd={handleAddChild}
+        onShowAddForm={() => setShowAddForm(true)}
+        onBackToList={() => setShowAddForm(false)}
+      />
+    );
+  }
+
+  if (!entered) {
+    return (
+      <main className="min-h-dvh grid place-items-center px-6 py-16">
+        <p className="text-step font-bold" aria-live="polite">
+          {justCreated ? 'Welcome' : 'Welcome back'}
+          {activeChild.name ? `, ${activeChild.name}` : ''}.
+        </p>
+      </main>
+    );
   }
 
   if (view === 'myWork') {
-    return <MyWork uid={authUser.uid} onBack={() => setView('task')} />;
+    return (
+      <MyWork
+        uid={authUser.uid}
+        childId={activeChild.id}
+        childName={activeChild.name}
+        onBack={() => setView('task')}
+      />
+    );
   }
 
   if (assignment === null) {

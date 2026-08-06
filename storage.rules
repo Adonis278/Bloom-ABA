@@ -1,15 +1,15 @@
 rules_version = '2';
 
-/* Content a student uploads to learn from — same ownership model as
-   Firestore: the student owns everything under their own uid, nobody else
-   can read or write it. No adult path reaches this bucket at all (compare
-   firestore.rules: adults only ever read summaries/{uid}, and even that has
-   no analog here — uploaded files are never aggregated or surfaced to an
-   adult in any form). */
+/* Content uploaded to learn from — same ownership model as Firestore: the
+   authenticated adult (parent/teacher) owns everything under their own uid,
+   nobody else can read or write it. A selected child is metadata, not a
+   separate security principal — see firestore.rules and CLAUDE.md
+   "Kindergarten & the adult-authenticates, child-selects model". No adult
+   READ path from a different account reaches this bucket at all. */
 
 service firebase.storage {
   match /b/{bucket}/o {
-    match /uploads/{uid}/{fileName} {
+    match /uploads/{uid}/{childId}/{fileName} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 

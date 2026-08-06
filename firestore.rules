@@ -36,18 +36,26 @@ service cloud.firestore {
         && get(/databases/$(db)/documents/shares/$(request.auth.uid)).data.revokedAt == null;
     }
 
-    // The student owns everything under their uid.
+    // profiles/{uid} — uid is the AUTHENTICATED ADULT (parent/teacher).
+    // Holds no PII about the adult at all, not even a name — see
+    // CLAUDE.md "Kindergarten & the adult-authenticates, child-selects
+    // model". Everything under it is scoped by the SAME adult uid; a
+    // selected child is a UI concept, not a separate security principal.
+    // Subcollection rules don't inherit from the parent match, so
+    // children/ and children/{id}/history/ each need their own block even
+    // though they're nested under the same path.
     match /profiles/{uid} {
       allow read, write: if signedIn() && request.auth.uid == uid;
 
-      // The real history list of past steps/uploads the student asked to
-      // be able to see. A deliberate, scoped exception to CLAUDE.md hard
-      // rule 4 ("never show a list of steps") — the live Entry/Step loop
-      // is untouched; this is a separate, student-owned view. Subcollection
-      // rules don't inherit from the parent match, so this needs its own
-      // block even though it's nested under the same path.
-      match /history/{entryId} {
+      match /children/{childId} {
         allow read, write: if signedIn() && request.auth.uid == uid;
+
+        // The real history list of past steps/uploads — a deliberate,
+        // scoped exception to CLAUDE.md hard rule 4 ("never show a list
+        // of steps"). The live Entry/Step loop is untouched.
+        match /history/{entryId} {
+          allow read, write: if signedIn() && request.auth.uid == uid;
+        }
       }
     }
 

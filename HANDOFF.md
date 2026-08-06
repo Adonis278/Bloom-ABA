@@ -1,4 +1,66 @@
-# Handoff — account model, landing page, My Work (built, NOT yet deployed)
+# Handoff — kindergarten scope, child picker, marketing removed (NOT yet deployed)
+
+**Newest pass — read this before anything below.** The live deployed version
+(https://bloom-aba.web.app) is one step behind this: it still shows the
+Google-account-holder's own "Welcome back" and a marketing-style landing
+page. This pass changes both, on request:
+
+1. **Kindergarten added to the target population, scoped to sign-in/entry
+   only.** The core loop is untouched — `functions/prompt.js`, `validate.js`,
+   the whole generation pipeline. Confirmed explicitly before building:
+   grades 6-9's text-based assignments/steps/prompt-levels stay exactly as
+   they are; only who's authenticating and how they're greeted changed.
+2. **Adult authenticates, child selects — a real second identity layer,**
+   not just a copy change. Google sign-in is now purely a device-trust
+   mechanism for a parent/teacher; the actual student is chosen or added
+   afterward via `ChildPicker.jsx` (plain name + emoji, no login of their
+   own). One adult account can cover several children. See CLAUDE.md
+   "Landing page & account model" for the full reasoning, including the
+   security tradeoff this introduces (children under the *same* adult
+   account share a security boundary — cross-*account* access is still
+   fully denied, verified below).
+3. **Marketing copy removed from `LandingPage.jsx`** — no tagline, no
+   persuasive paragraph. Just a plain company name (`COMPANY_NAME` constant,
+   currently the placeholder `"Bloom"` — **still waiting on the real
+   company name**, swap that one constant once you have it) and one flat
+   sentence. The floating breathing widget stayed — that's a sign-in
+   affordance, not sales copy.
+4. **PII footprint is now smaller than the previous pass, not just
+   relocated.** The adult's Google profile is never read for a name, email,
+   or photo at all anymore — `profiles/{uid}` holds only timestamps.
+   "Welcome back" now uses the *child's* self-typed name, not anything
+   pulled from OAuth.
+5. **Data model changed**: history moved from `profiles/{uid}/history` to
+   `profiles/{uid}/children/{childId}/history`. `firestore.rules` and
+   `storage.rules` updated to match (still enforced at the adult's uid, one
+   level up from the child — see CLAUDE.md for why).
+
+## Schema reference (current)
+
+```
+profiles/{uid}                                    uid = the adult's Firebase Auth uid
+  createdAt, lastSeenAt                            nothing else — no name, no email, no photo
+
+profiles/{uid}/children/{childId}
+  name, avatar (emoji), createdAt, lastSeenAt
+
+profiles/{uid}/children/{childId}/history/{entryId}
+  type ('step'|'upload'), text, assignmentText, fileName, fileUrl, createdAt
+
+Storage: uploads/{uid}/{childId}/{fileName}
+```
+
+## What's still true from the previous pass (unaffected by this one)
+
+The Google-OAuth-popup-can't-be-clicked-through-in-this-harness limitation
+still applies (see below) — same reasoning, same mitigation (verify the
+rules/logic directly against the emulator with real tokens rather than
+through the popup UI). Storage still isn't provisioned on the live project
+(needs the one-time console "Get Started" click) — unaffected by this pass.
+
+---
+
+
 
 **This section is newer than the "MVP loop" section below it — read this first.**
 The account model changed from anonymous-only to Google sign-in, by explicit

@@ -3,27 +3,32 @@ import { listHistory } from '../lib/history.js';
 import { uploadContent } from '../lib/uploads.js';
 import { signOutUser } from '../lib/firebase.js';
 
-/* The real history list of past steps and uploaded content, tied to the
-   signed-in account — a deliberate, scoped exception to hard rule 4 ("never
-   show a list of steps"). See CLAUDE.md "Landing page & account model" for
-   why this is allowed here specifically and not on Entry/Step.
+/* The real history list of past steps and uploaded content — a deliberate,
+   scoped exception to hard rule 4 ("never show a list of steps"). See
+   CLAUDE.md "Kindergarten & the adult-authenticates, child-selects model"
+   for why this is allowed here specifically and not on Entry/Step.
+
+   Scoped to the active child (childId), not the adult account (uid)
+   directly — siblings or students sharing one adult's Google account don't
+   see each other's work, even though security is enforced one level up at
+   the adult's uid.
 
    Reached only from Entry's small "My work" link, never from Step — the
    in-task screen keeps its original one-focal-element purity untouched. */
-export default function MyWork({ uid, onBack }) {
+export default function MyWork({ uid, childId, childName, onBack }) {
   const [entries, setEntries] = useState(null); // null = loading
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
   async function refresh() {
-    const list = await listHistory(uid);
+    const list = await listHistory(uid, childId);
     setEntries(list);
   }
 
   useEffect(() => {
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uid]);
+  }, [uid, childId]);
 
   async function handleFileChange(e) {
     const file = e.target.files?.[0];
@@ -31,7 +36,7 @@ export default function MyWork({ uid, onBack }) {
     if (!file) return;
     setUploading(true);
     try {
-      await uploadContent(uid, file);
+      await uploadContent(uid, childId, file);
       await refresh();
     } catch {
       // No error state shown (hard rule 1) — the upload just doesn't
@@ -61,7 +66,7 @@ export default function MyWork({ uid, onBack }) {
           </button>
         </div>
 
-        <h1 className="mb-8 text-step font-bold">My work</h1>
+        <h1 className="mb-8 text-step font-bold">{childName ? `${childName}'s work` : 'My work'}</h1>
 
         <section className="card-lit mb-10 px-6 py-6">
           <p className="mb-3 text-[0.9375rem] text-muted">

@@ -153,44 +153,71 @@ that spins, pulses, or fills is not.
 ## Landing page & account model
 
 This app started zero-account (BR1, hard rule 3 as originally written). That
-changed by explicit product decision: every user now signs in with Google
-before reaching the tool, with the device remembered afterward via Firebase
-Auth's normal persisted session — no custom fingerprinting, just the SDK's
-default local persistence. A returning session auto-restores with no click
-needed. This was raised as a conflict against the hard rules before building
-it, and reaffirmed with a specific implementation detail ("remember device,
-welcome back"), so it's built as a real decision, not a quiet drift.
+changed by explicit product decision, in two steps:
 
-**The design-register boundary is the load-bearing idea.** `LandingPage.jsx`
-is allowed to look like a normal marketing page — bigger type, a floating
-"breathing" widget with a slow ambient pulse, the job of making a first
-impression and getting someone to act. `Entry.jsx` and `Step.jsx` are
-untouched: still one focal element, still no ambient motion, still the
-one-crossfade budget. What still holds on the landing page regardless: no
-red, no exclamation marks, no sound that plays without an explicit action —
-those protect this population everywhere, not just mid-task. What's scoped
-out there specifically: one-focal-element, no-list, the motion budget,
-no-spinner — those are about the moment of doing the work, and the landing
-page isn't that moment.
+1. Every user signs in with Google before reaching the tool, device
+   remembered afterward via Firebase Auth's normal persisted session — no
+   custom fingerprinting, just the SDK's default local persistence.
+2. **The signer-in and the student are not assumed to be the same person.**
+   The population now explicitly includes kindergarten-age kids, who can't
+   realistically manage an OAuth flow or meaningfully consent to one. The
+   resolved model: an **adult** (parent/teacher) authenticates via Google —
+   that's the entire job Google sign-in does now, pure device trust, nothing
+   about the adult is ever shown or stored. The **child** — the actual
+   student — is selected or added afterward from `ChildPicker.jsx`, a plain
+   list of names/pictures with no login of their own. One Google account can
+   cover several children (siblings, a shared classroom device).
 
-**PII minimization.** BRD.md's own constraints flag COPPA/FERPA exposure for
-this user base ("no PII, no content logging") — pulling a minor's real name
-and email via Google OAuth is a materially different privacy posture than
-anonymous auth was. Mitigation: `profiles/{uid}` stores only a first name
-(parsed from `displayName`, used solely for "Welcome back, {name}") and
-timestamps. Email and photo URL are never read off the Google profile, never
-stored. This is a deliberate scope limit — flagged to the user once, not
-resolved further; a real compliance review before any wider release should
-revisit it.
+Both changes were raised as conflicts against the hard rules before being
+built, and both were reaffirmed with specific implementation detail, so
+they're recorded as decisions, not silent drift. **Kindergarten support was
+explicitly scoped to sign-in/entry only** — the core loop (assignments, text
+steps, prompt levels 0–4) is unchanged and still built for grades 6–9;
+`functions/prompt.js` and `validate.js` were not touched for this. If the
+tool needs a genuinely different interaction model for pre-literate kids
+(pictures/audio instead of paragraphs), that's a separate decision to make
+explicitly, not something to infer from this pass.
 
-**"My work" (`MyWork.jsx`)** is the real history list the student asked for —
-`profiles/{uid}/history/{entryId}`, holding both completed steps and uploaded
-files, readable and writable only by the owning uid (`firestore.rules`,
-`storage.rules`). This is a genuinely different privacy posture than
-`summaries/{uid}` (DESIGN.md section 2): summaries stay aggregate-only and
-adult-readable; history holds real content and has no adult read path
-anywhere. Do not conflate the two collections, and do not give any adult
-surface access to `profiles/{uid}/history`.
+**Marketing copy was removed by request.** `LandingPage.jsx` no longer has a
+tagline or persuasive body text — just a plain company-name header (`Bloom`,
+a placeholder pending the real name — one constant,
+`LandingPage.jsx`'s `COMPANY_NAME`) and one flat sentence. The floating
+breathing widget stayed; that's a functional sign-in affordance the user
+asked for as a feature, not sales copy, and it's still the one surface
+allowed ambient motion — `Entry.jsx` and `Step.jsx` remain untouched: one
+focal element, no ambient motion, the one-crossfade budget. What still holds
+everywhere regardless of register: no red, no exclamation marks, no sound
+that plays without an explicit action.
+
+**PII minimization, now stricter than the first pass.** The first version of
+this stored a first name off the Google profile for "Welcome back, {name}."
+That's gone — the adult's Google identity is never read for a name, email,
+or photo at all; `profiles/{uid}` holds nothing but timestamps. Welcome
+messages now use the **child's** self-chosen name (typed once, into
+`ChildPicker.jsx`, by whoever set them up) — data the family/classroom
+supplied directly, not pulled from an OAuth profile. This is a meaningfully
+smaller privacy footprint than the previous version, driven by the same
+BRD.md COPPA/PII constraint, made sharper now that the population explicitly
+includes kindergarten-age children.
+
+**"My work" (`MyWork.jsx`)** is the real history list — now
+`profiles/{uid}/children/{childId}/history/{entryId}`, nested under the
+specific child so siblings/classmates sharing one adult's account don't see
+each other's work. Security is still enforced one level up, at the adult's
+uid (`firestore.rules`, `storage.rules`) — a selected child is a UI concept,
+not a separate Firebase Auth principal. This is a deliberate simplification:
+it avoids building a second, parallel identity system under time pressure,
+at the cost of siblings on the *same* account technically sharing a security
+boundary (not from each other, cross-account access is still fully denied —
+see the verification below — but a technically sophisticated sibling
+inspecting their own authenticated requests could reach another child's
+history under the *same* Google account). Acceptable for a shared
+family/classroom device; would need real per-child auth if children ever
+used the tool independently of the adult's session. This is a genuinely
+different privacy posture than `summaries/{uid}` (DESIGN.md section 2):
+summaries stay aggregate-only and adult-readable; history holds real content
+and has no adult read path anywhere. Do not conflate the two, and do not
+give any adult surface access to the `history` subcollection.
 
 **Read-aloud.** Step.jsx has a "Listen" button using the browser's
 `SpeechSynthesis` API — no cloud call, no key, no cost. Explicit user action
