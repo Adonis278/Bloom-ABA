@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { runGenerateStep } from './core.js';
+import { runGenerateExample } from './example.js';
 
 /* Keys never reach the client. They are Cloud Secret Manager secrets, bound to
    the function below, and read only inside the handler.
@@ -48,5 +49,28 @@ export const generateStep = onCall(
     };
 
     return runGenerateStep(req.data, keys);
+  },
+);
+
+/* generateExample — in { assignment, workSoFar, step } / out { example }.
+
+   Called only when the student is already stuck, and only after the step is
+   already on screen. Never throws to the client and never blocks a step:
+   example.js resolves to { example: null } on any failure, and the UI simply
+   shows nothing extra. */
+export const generateExample = onCall(
+  {
+    region: 'us-central1',
+    secrets: [NVIDIA_API_KEY, ANTHROPIC_API_KEY],
+    minInstances: 0,
+    memory: '256MiB',
+    timeoutSeconds: 30,
+  },
+  async (req) => {
+    const keys = {
+      nvidia: NVIDIA_API_KEY.value(),
+      anthropic: ANTHROPIC_API_KEY.value(),
+    };
+    return runGenerateExample(req.data, keys);
   },
 );

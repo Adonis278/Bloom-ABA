@@ -11,7 +11,7 @@ import Entry from './screens/Entry.jsx';
 import Step from './screens/Step.jsx';
 import MyWork from './screens/MyWork.jsx';
 import AdultView from './screens/AdultView.jsx';
-import { generateStep } from './lib/generateStep.js';
+import { generateStep, generateExample } from './lib/generateStep.js';
 
 const MAX_PROMPT_LEVEL = 4;
 const FALLBACK_STEP = 'Open the document you are working on.';
@@ -120,8 +120,18 @@ export default function App() {
     setExpectedSeconds(activeChild.expectedSeconds ?? EXPECTED_SECONDS_DEFAULT);
   }, [activeChild]);
 
+  /* Shown only when the student is already stuck (a stall or a rejected
+     step), never on a step they are moving through fine — an example on
+     every step would be one more thing to read on a screen that is
+     deliberately one thing at a time. Fetched after the step is already
+     rendered, so it never delays the step itself. */
+  const [example, setExample] = useState(null);
+  const stepRef = useRef(null);
+
   const requestStep = useCallback(async ({ text, level, done, reason }) => {
     setPending(true);
+    setExample(null);
+    const wantsExample = reason === 'silent_stall' || reason === 'too_big';
     try {
       const next = await generateStep({
         assignment: text,
@@ -131,6 +141,17 @@ export default function App() {
         reason,
       });
       setStep(next);
+      stepRef.current = next;
+      if (wantsExample) {
+        generateExample({ assignment: text, workSoFar: workSoFarRef.current, step: next })
+          .then((ex) => {
+            // Drop a late arrival for a step the student has already left —
+            // compared against a ref, not inside a state updater, so the
+            // check can't be skipped or double-run.
+            if (ex && stepRef.current === next) setExample(ex);
+          })
+          .catch(() => {});
+      }
     } catch {
       // Hard rule 1: no error state. core.js already guarantees a usable
       // step for every failure *inside* the function; this covers the
@@ -321,6 +342,7 @@ export default function App() {
       onTooBig={handleTooBig}
       workSoFar={workSoFar}
       onWorkSoFarChange={setWorkSoFar}
+      example={example}
     />
   );
 }

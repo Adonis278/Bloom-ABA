@@ -13,3 +13,17 @@ export async function generateStep({ assignment, workSoFar, completedSteps, prom
   const { data } = await callable({ assignment, workSoFar, completedSteps, promptLevel, reason });
   return data.step;
 }
+
+const exampleCallable = httpsCallable(functions, 'generateExample');
+
+/* Fetched only when the student is already stuck, and only after the step is
+   showing. Resolves to null on any failure — the step stands on its own and
+   nothing about the loop depends on an example arriving. */
+export async function generateExample({ assignment, workSoFar, step }) {
+  try {
+    const { data } = await exampleCallable({ assignment, workSoFar, step });
+    return data.example ?? null;
+  } catch {
+    return null;
+  }
+}

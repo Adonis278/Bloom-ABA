@@ -333,6 +333,45 @@ punctuation. Verified directly: a scripted check against the Firestore
 emulator confirmed every written step doc contains only the fields listed
 above, nothing resembling draft content.
 
+## Worked examples when stuck
+
+`generateExample` (`functions/example.js`) returns one concrete sentence the
+student could actually put on the page — shown **only** after a stall or a
+rejected step, never on a step they are moving through fine. An example on
+every step is one more thing to read on a screen that is deliberately one
+thing at a time.
+
+**It is a second, separate callable on purpose.** The step must never wait on
+it: `Step.jsx` renders the step immediately and the example appears when it
+arrives, so a slow or failed example costs nothing. Folding it into
+`generateStep` would also have pushed that prompt past its tier-1 latency
+budget (see "Step generation rules").
+
+Rules learned from live testing, all load-bearing:
+- **Send the draft, not just the tail.** With only the last 240 characters
+  the model wrote "We rented a little boat on **Lake Tahoe**" for a student
+  whose draft says Lake Anna — the name sat outside the window, so it
+  invented one. An example that contradicts the student's own page is worse
+  than no example.
+- **Filter instructional openers, not bare pronouns.** The first version
+  rejected anything starting with "it", "this", or "here", which silently
+  threw away good sentences — "It was scary at first" is exactly the voice
+  we want. `META_START` now matches whole phrases ("you could", "try to",
+  "for example").
+- Rendered as a hairline + muted label + one bold sentence. No colour, no
+  box, nothing that reads as a warning.
+
+## Extensions can break hard rule 1 for us
+
+`Step.jsx`'s workspace textarea carries `spellCheck="false"`,
+`data-gramm="false"`, and `data-enable-grammarly="false"`. Found by testing
+on a real machine: Grammarly attaches to that textarea and draws **red
+squiggles under the student's own sentences** — precisely the corrective
+red-ink signal this product exists to avoid, on the one surface where the
+student is being asked to take a risk. Our own CSS cannot reach it; opting
+the field out can. We cannot control every extension, but we decline the
+common ones. Keep these attributes on any future student writing surface.
+
 ## Adult analytics dashboard
 
 BRD.md scopes this (O5, BR6/7, BR10/11, §10 metrics) and DESIGN.md reserved

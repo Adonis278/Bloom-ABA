@@ -25,6 +25,13 @@ export function useStuckDetector({ active, step, workSoFar, expectedSeconds, onS
   const firstKeystrokeAtRef = useRef(null);
   const stalledRef = useRef(false);
   const rejectedRef = useRef(false);
+  /* Deliberately NOT reset per step. Counts stalls the student never
+     answered with a keystroke. Caught in live testing: after one stall the
+     next step arrives, nothing is typed, and it stalls again on the same
+     silence — walking the prompt level up to its maximum while nobody is
+     there. One shrink is help; four in a row is talking to an empty chair.
+     Any real keystroke clears this and re-arms the detector fully. */
+  const unansweredStallsRef = useRef(0);
   const workSoFarRef = useRef(workSoFar);
   const onStallRef = useRef(onStall);
 
@@ -50,6 +57,7 @@ export function useStuckDetector({ active, step, workSoFar, expectedSeconds, onS
     function onKeyDown(e) {
       lastKeyTimeRef.current = performance.now();
       if (firstKeystrokeAtRef.current === null) firstKeystrokeAtRef.current = lastKeyTimeRef.current;
+      unansweredStallsRef.current = 0; // they're here — re-arm fully
       keystrokesRef.current += 1;
       if (e.key === 'Backspace' || e.key === 'Delete') backspacesRef.current += 1;
     }
@@ -94,6 +102,11 @@ export function useStuckDetector({ active, step, workSoFar, expectedSeconds, onS
 
       if (score >= INTERVENE_THRESHOLD) {
         stalledRef.current = true;
+        // Nothing typed on this step, and the last stall also went
+        // unanswered — they have left the desk. Shrinking again would only
+        // burn prompt levels against silence.
+        if (keystrokes === 0 && unansweredStallsRef.current >= 1) return;
+        unansweredStallsRef.current += 1;
         onStallRef.current?.(score);
       }
     }, TICK_MS);

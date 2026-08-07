@@ -36,7 +36,17 @@ export function mapDraft(rawDraft) {
     !SENTENCE_END.test(blocks[0]);
 
   const paragraphs = hasTitle ? blocks.slice(1) : blocks;
-  const endsMidSentence = !SENTENCE_END.test(draft);
+
+  /* A single short line with no ending punctuation is a name or a title, not
+     a sentence someone abandoned halfway. Caught in live testing: a student
+     who had typed just "Jerome" at the top of the page was told to "write
+     the rest of the sentence about Jerome," because a bare name looks
+     identical to a broken-off sentence by punctuation alone. Length is what
+     separates them. */
+  const lastBlock = blocks[blocks.length - 1];
+  const looksLikeBareHeading =
+    blocks.length === 1 && words(lastBlock).length <= TITLE_MAX_WORDS && !SENTENCE_END.test(lastBlock);
+  const endsMidSentence = !SENTENCE_END.test(draft) && !looksLikeBareHeading;
   const sentenceCount = (draft.match(/[.!?]+/g) ?? []).length;
 
   return {

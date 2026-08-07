@@ -32,7 +32,7 @@ const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in wi
    App.jsx (cumulative across the whole assignment, feeds the LLM); this
    component only renders it. It's hidden during the very first load since
    there's nothing to work on yet. */
-export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWorkSoFarChange }) {
+export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWorkSoFarChange, example }) {
   const isFirstLoad = pending && !step;
   const [showSecondLine, setShowSecondLine] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -93,6 +93,19 @@ export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWor
           </Crossfade>
         </div>
 
+        {/* Only present when the student is already stuck. Set apart by a
+            hairline and muted label rather than a colour or a box — no red,
+            no new hue, nothing that reads as a warning. The sample sentence
+            itself is the one bold thing, so the eye lands on the words they
+            can actually use. */}
+        {!isFirstLoad && example && (
+          <div className="mt-8 border-t border-line pt-5">
+            <p className="mb-2 text-[0.8125rem] text-muted">One way it could look:</p>
+            <p className="text-[1.0625rem] font-bold leading-[1.55] text-ink">{example}</p>
+            <p className="mt-2 text-[0.8125rem] text-muted">Copy it, or change any part.</p>
+          </div>
+        )}
+
         {!isFirstLoad && (
           <textarea
             aria-label="Work here if you want to"
@@ -100,6 +113,17 @@ export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWor
             value={workSoFar}
             onChange={(e) => onWorkSoFarChange(e.target.value)}
             placeholder="Work here if you want to."
+            /* Hard rule 1 reaches past our own CSS here. Observed in live
+               testing: Grammarly attaches to this textarea and draws red
+               squiggles under the student's sentences — exactly the
+               corrective red-ink signal this product exists to avoid, on the
+               one surface where they are being asked to take a risk. These
+               three attributes turn off our spellcheck and opt the field out
+               of Grammarly and Microsoft Editor. We cannot control every
+               extension, but we can decline the common ones. */
+            spellCheck="false"
+            data-gramm="false"
+            data-enable-grammarly="false"
             className="card-lit mt-6 w-full resize-none px-5 py-4 text-[0.9375rem] leading-[1.55] text-ink outline-none placeholder:text-muted"
           />
         )}
