@@ -10,6 +10,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase.js';
+import { medianOf } from './scoring.js';
 
 /* profiles/{uid} — uid is the AUTHENTICATED ADULT's Firebase Auth uid (the
    parent/teacher who signed in with Google). This document holds nothing
@@ -61,6 +62,26 @@ export async function touchChild(uid, childId) {
   await setDoc(
     doc(db, 'profiles', uid, 'children', childId),
     { lastSeenAt: serverTimestamp() },
+    { merge: true },
+  );
+}
+
+// Cold-start default (spec.md Part 2) lives in scoring.js; this only ever
+// writes once a step has actually been completed independently, so new
+// children naturally fall back to that default until real samples exist.
+// Bounded rolling window, not the full history — recent pace matters more
+// than a stale one from weeks ago.
+const EXPECTED_SECONDS_WINDOW = 10;
+
+export async function updateExpectedSeconds(uid, childId, samples) {
+  const trimmed = samples.slice(-EXPECTED_SECONDS_WINDOW);
+  await setDoc(
+    doc(db, 'profiles', uid, 'children', childId),
+    {
+      expectedSecondsSamples: trimmed,
+      expectedSeconds: medianOf(trimmed),
+      lastSeenAt: serverTimestamp(),
+    },
     { merge: true },
   );
 }

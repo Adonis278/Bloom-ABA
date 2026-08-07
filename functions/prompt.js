@@ -21,6 +21,8 @@ const REASON_SPEC = {
   next: 'The student just finished the previous step. Give the next physical action toward the assignment.',
   too_big:
     'The student said the last step was too big. Keep the same goal, but make it smaller — less of it, not a different task.',
+  silent_stall:
+    'The student has been stuck without saying anything. Drop the demand — smaller, more literal, or fewer choices than the last step.',
 };
 
 const RETRY_HINTS = {

@@ -21,3 +21,6 @@ ui-debug.log
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code runtime state (session locks), not project config
+.claude/scheduled_tasks.lock

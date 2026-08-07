@@ -228,6 +228,119 @@ highlighting is the fuller scope and isn't built.
 
 ---
 
+## Premade assignment
+
+`Entry.jsx`'s textarea now opens pre-filled with a real assignment (a summer-
+break reflection for English class) instead of blank — an explicit product
+decision, not a shortcut: the point is that a student can land on the tool
+and see the whole loop work without having to type or paste anything first.
+It's still a plain `useState` initial value, fully editable, same as before.
+
+## Stall detection
+
+Built this pass: real silent-stall detection (spec.md Part 2) — auto-shrink
+on a genuine stall, and fading back down after two independent completions.
+**Deliberately not built**, by explicit product decision: modality
+auto-switch (stall #2 on DESIGN.md's ladder) and a break-offer screen (stall
+#3) — both are separate decisions with their own UI surface, not silently
+folded into this pass.
+
+**The workspace textarea on Step.jsx** is the first real text-input surface
+there, a scoped exception to hard rule 3 the same way the "My work" link and
+LandingPage are — the demand is real: the student needs somewhere to
+actually write for a *written* assignment. `workSoFar` is owned by
+`App.jsx`, cumulative across the whole assignment (feeds the LLM via
+`functions/prompt.js`'s `WORK_SO_FAR`), and resets only when a new
+assignment starts.
+
+**The math is in `src/lib/scoring.js`, coefficients straight from spec.md/
+DESIGN.md**, unchanged from the docs. The one thing the docs didn't pin down
+is what counts as "a sentence boundary or a genuine pause" — resolved here as
+either a ≥4s gap since the last keystroke, or the draft ending in
+`. ! ? \n` with ≥1s settled. Score is only ever computed at one of those gate
+moments, never mid-sentence. `src/hooks/useStuckDetector.js` collects the
+raw counts (keystrokes, a Backspace/Delete count, tab-away count, and
+`workSoFar.length` diffs) that feed the formula — see hard rule 7 below for
+why it never touches the string itself.
+
+**Escalation logic lives directly in `App.jsx`**, not a `useStepEngine.js`
+hook — this MVP only builds 2 of DESIGN.md's 7 escalation rows (silent stall
+→ shrink, fading), and every other piece of task-loop state there is already
+a flat `useState` with plain handler functions. Revisit as a real hook if
+the fuller ladder gets built.
+
+**Firestore**: `profiles/{uid}/children/{childId}/sessions/{sessionId}` (one
+per assignment attempt) and its `steps/{stepId}` subcollection (one per
+generated step) — nested under the child, the same pattern `history` already
+uses, replacing an older flat `sessions/{sid}` schema in `firestore.rules`
+that predated the child model and was never actually written to. Step docs
+hold **only counts and timestamps** — `target` (the step's own text, same
+category of content `history.js` already stores), `promptLevel`, `latencyMs`,
+`keystrokes`, `deletes`, `netChars`, `tabAways`, `modality`, `rejected`,
+`independent`, `outcome`, `stuckScoreAtIntervention`. Never the student's
+draft. `src/lib/sessions.js` is the write path, mirroring `history.js`'s
+fire-and-forget style. `expectedSeconds` (the cold-start-90s, then
+rolling-median-of-last-10 duration used in the score formula) is stored
+per child in `profile.js`'s `updateExpectedSeconds`, recomputed only on an
+independently completed step.
+
+**Hard rule 7, made concrete here**: `useStuckDetector.js`'s keydown handler
+only ever records a timestamp and classifies Backspace/Delete — the same
+category of check as `Entry.jsx`'s existing `e.key === 'Enter'` — never the
+character typed. `workSoFar` is read only for `.length` and its trailing
+punctuation. Verified directly: a scripted check against the Firestore
+emulator confirmed every written step doc contains only the fields listed
+above, nothing resembling draft content.
+
+## Adult analytics dashboard
+
+BRD.md scopes this (O5, BR6/7, BR10/11, §10 metrics) and DESIGN.md reserved
+its design language (IBM Plex Mono, "flat rows and hairlines, no cards") and
+a Firestore shape (`summaries/{uid}`, a `recomputeSummary` Cloud Function,
+`shares/{code}`) — none of which was ever built until this pass, and this
+pass **doesn't build that architecture**. `summaries`/`shares` in
+`firestore.rules` stay as dormant, forward-looking stubs, untouched.
+
+**Why the departure**: DESIGN.md's model assumed a second, non-owning adult
+granted revocable access by the student via a share code. This app's real
+adult is the signed-in account owner (the "Kindergarten &
+adult-authenticates-child-selects model" above) — they already fully read
+everything under their own uid, by design. There's no boundary left for a
+server-written aggregate doc to protect. **Explicit, temporary
+simplification, confirmed with the user**: the signed-in adult sees
+`AdultView.jsx` directly for the child they've selected, reached via a
+second small Entry-only link ("Progress", same category as "My work" —
+never on Step). The real share-code/second-adult model is still the target
+eventually, not abandoned.
+
+`src/lib/analytics.js` computes all four metrics **client-side, live**, by
+reading the child's own `sessions`/`steps` (already fully readable, no rules
+change). This also means the data "keeps building over time" for free —
+nothing is cached or needs a recompute trigger. It returns only derived
+aggregates — `promptLevelSeries`, `stallRecovery`, `completion`,
+`timeToFirstKeystroke` — and structurally never returns `target` or
+`assignmentText`, even though it reads docs that contain them. That's the
+real privacy boundary for this feature (hard rule 10, applied here even
+though the account-ownership tradeoff means it isn't strictly required):
+`AdultView.jsx` never has access to content, only counts.
+
+**"Assignment completion" is an honest proxy, not a real signal.** Nothing
+in the app marks an assignment finished — the loop just keeps generating
+"next" steps. A session counts as "completed" here if its most recent
+logged step ended with `outcome: 'completed'` (not mid-reject, not
+mid-stall). Labeled as a proxy in the UI copy itself, not presented as true
+completion tracking.
+
+`useStuckDetector.js` gained one more captured count,
+`firstKeystrokeMs` — BRD's "seconds from assignment on screen to first
+character" — set once per step, meaningful only on a session's
+chronologically-first step doc. Still just a timestamp diff, same hard-rule-7
+category as everything else it tracks.
+
+Charts (`src/components/TrendChart.jsx`) are hand-rolled SVG, no new
+dependency — matches `Crossfade.jsx`'s existing precedent. Tokens only, no
+new hues, no red/green status coding on rates.
+
 ## Verification
 
 Before claiming anything works: run it, and confirm the output. Do not report a

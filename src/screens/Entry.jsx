@@ -1,5 +1,11 @@
 import { useState } from 'react';
 
+// A real, ready-to-go assignment instead of a blank box — see CLAUDE.md
+// "Premade assignment" for why. Still just the textarea's initial value;
+// fully editable, not a fixture.
+const SAMPLE_ASSIGNMENT =
+  'Write a one-page reflection about something you did over summer break for English class. Due Friday.';
+
 /* One textarea, one Start button. Nothing else competes for attention here
    (hard rule 3) — the one exception is a small "My work" link, added when
    accounts became real. It's text-only, muted, and lives in a corner
@@ -7,8 +13,8 @@ import { useState } from 'react';
    "in the middle of it," and the in-task screen keeps its original,
    unmodified one-focal-element purity. See CLAUDE.md "Landing page &
    account model". */
-export default function Entry({ onStart, onMyWork }) {
-  const [assignment, setAssignment] = useState('');
+export default function Entry({ onStart, onMyWork, onProgress }) {
+  const [assignment, setAssignment] = useState(SAMPLE_ASSIGNMENT);
   const canStart = assignment.trim().length > 0;
 
   function start() {
@@ -25,6 +31,15 @@ export default function Entry({ onStart, onMyWork }) {
           className="tap fixed right-4 top-4 rounded-lg px-3 text-[0.8125rem] text-muted"
         >
           My work
+        </button>
+      )}
+      {onProgress && (
+        <button
+          type="button"
+          onClick={onProgress}
+          className="tap fixed left-4 top-4 rounded-lg px-3 text-[0.8125rem] text-muted"
+        >
+          Progress
         </button>
       )}
       <div className="w-full max-w-[620px]">

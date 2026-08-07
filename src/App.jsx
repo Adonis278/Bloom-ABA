@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { auth, onAuthStateChanged, signInWithGoogle } from './lib/firebase.js';
-import { ensureAdultProfile, listChildren, createChild, touchChild } from './lib/profile.js';
+import { ensureAdultProfile, listChildren, createChild, touchChild, updateExpectedSeconds } from './lib/profile.js';
 import { addHistoryEntry } from './lib/history.js';
+import { startSession, addStepEntry } from './lib/sessions.js';
+import { medianOf, EXPECTED_SECONDS_DEFAULT } from './lib/scoring.js';
+import { useStuckDetector } from './hooks/useStuckDetector.js';
 import LandingPage from './screens/LandingPage.jsx';
 import ChildPicker from './screens/ChildPicker.jsx';
 import Entry from './screens/Entry.jsx';
 import Step from './screens/Step.jsx';
 import MyWork from './screens/MyWork.jsx';
+import AdultView from './screens/AdultView.jsx';
 import { generateStep } from './lib/generateStep.js';
 
 const MAX_PROMPT_LEVEL = 4;
@@ -35,7 +39,7 @@ export default function App() {
   const [activeChild, setActiveChild] = useState(null);
   const [justCreated, setJustCreated] = useState(false);
   const [entered, setEntered] = useState(false);
-  const [view, setView] = useState('task'); // 'task' | 'myWork'
+  const [view, setView] = useState('task'); // 'task' | 'myWork' | 'adultView'
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
@@ -95,13 +99,33 @@ export default function App() {
   const [completedSteps, setCompletedSteps] = useState([]);
   const [promptLevel, setPromptLevel] = useState(0);
   const [pending, setPending] = useState(false);
+  const [workSoFar, setWorkSoFar] = useState('');
+  const [independentStreak, setIndependentStreak] = useState(0);
+  const [expectedSeconds, setExpectedSeconds] = useState(EXPECTED_SECONDS_DEFAULT);
+
+  // workSoFar mirrored into a ref so requestStep always sends the latest
+  // draft without needing to be recreated on every keystroke — same
+  // ref-mirrors-state pattern Step.jsx already uses for `step`.
+  const workSoFarRef = useRef('');
+  workSoFarRef.current = workSoFar;
+  const sessionIdRef = useRef(null);
+  // Per-child rolling window of completed-step durations, seeded from
+  // Firestore and kept in sync locally so fading/expectedSeconds don't lag
+  // a render behind — see profile.js's updateExpectedSeconds.
+  const samplesRef = useRef([]);
+
+  useEffect(() => {
+    if (!activeChild) return;
+    samplesRef.current = activeChild.expectedSecondsSamples ?? [];
+    setExpectedSeconds(activeChild.expectedSeconds ?? EXPECTED_SECONDS_DEFAULT);
+  }, [activeChild]);
 
   const requestStep = useCallback(async ({ text, level, done, reason }) => {
     setPending(true);
     try {
       const next = await generateStep({
         assignment: text,
-        workSoFar: '', // no draft surface yet — see HANDOFF.md
+        workSoFar: workSoFarRef.current,
         completedSteps: done,
         promptLevel: level,
         reason,
@@ -117,14 +141,34 @@ export default function App() {
     }
   }, []);
 
+  // Silent-stall detection (spec.md Part 2) — active only while a real step
+  // is actually on screen. See CLAUDE.md "Stall detection" for scope: this
+  // MVP builds auto-shrink + fading only, not the fuller escalation ladder.
+  const detector = useStuckDetector({
+    active: Boolean(activeChild) && entered && view === 'task' && assignment !== null && !pending && step !== null,
+    step,
+    workSoFar,
+    expectedSeconds,
+    onStall: handleSilentStall,
+  });
+
   function handleStart(text) {
     setAssignment(text);
+    setWorkSoFar('');
+    workSoFarRef.current = '';
+    setIndependentStreak(0);
+    if (authUser && activeChild) {
+      sessionIdRef.current = startSession(authUser.uid, activeChild.id, text);
+    }
     requestStep({ text, level: 0, done: [], reason: 'first' });
   }
 
   function handleDone() {
     const done = step ? [...completedSteps, step] : completedSteps;
     setCompletedSteps(done);
+
+    let nextLevel = promptLevel;
+
     if (authUser && activeChild && step) {
       addHistoryEntry(authUser.uid, activeChild.id, {
         type: 'step',
@@ -134,14 +178,75 @@ export default function App() {
         // Logging failure never blocks the loop the student is in the
         // middle of — same "no error state" principle as everywhere else.
       });
+
+      const metrics = detector.getStepMetrics();
+      addStepEntry(authUser.uid, activeChild.id, sessionIdRef.current, {
+        target: step,
+        promptLevel,
+        independent: true,
+        outcome: 'completed',
+        ...metrics,
+      });
+
+      // Fading (spec.md): two independent completions in a row drop the
+      // demand back down. The streak resets either way, so the next pair
+      // starts fresh.
+      const streak = independentStreak + 1;
+      if (streak >= 2) {
+        nextLevel = Math.max(promptLevel - 1, 0);
+        setIndependentStreak(0);
+      } else {
+        setIndependentStreak(streak);
+      }
+      setPromptLevel(nextLevel);
+
+      const nextSamples = [...samplesRef.current, metrics.latencyMs / 1000].slice(-10);
+      samplesRef.current = nextSamples;
+      setExpectedSeconds(medianOf(nextSamples));
+      updateExpectedSeconds(authUser.uid, activeChild.id, nextSamples).catch(() => {});
     }
-    requestStep({ text: assignment, level: promptLevel, done, reason: 'next' });
+
+    requestStep({ text: assignment, level: nextLevel, done, reason: 'next' });
   }
 
   function handleTooBig() {
     const level = Math.min(promptLevel + 1, MAX_PROMPT_LEVEL);
     setPromptLevel(level);
+    setIndependentStreak(0);
+
+    if (authUser && activeChild && step) {
+      detector.noteReject();
+      addStepEntry(authUser.uid, activeChild.id, sessionIdRef.current, {
+        target: step,
+        promptLevel,
+        rejected: 'too_big',
+        independent: false,
+        outcome: 'rejected',
+        ...detector.getStepMetrics(),
+      });
+    }
+
     requestStep({ text: assignment, level, done: completedSteps, reason: 'too_big' });
+  }
+
+  function handleSilentStall(score) {
+    const level = Math.min(promptLevel + 1, MAX_PROMPT_LEVEL);
+    setPromptLevel(level);
+    setIndependentStreak(0);
+
+    if (authUser && activeChild && step) {
+      addStepEntry(authUser.uid, activeChild.id, sessionIdRef.current, {
+        target: step,
+        promptLevel,
+        rejected: null,
+        independent: false,
+        outcome: 'shrunk',
+        stuckScoreAtIntervention: score,
+        ...detector.getStepMetrics(),
+      });
+    }
+
+    requestStep({ text: assignment, level, done: completedSteps, reason: 'silent_stall' });
   }
 
   if (authUser === undefined) {
@@ -187,9 +292,35 @@ export default function App() {
     );
   }
 
-  if (assignment === null) {
-    return <Entry onStart={handleStart} onMyWork={() => setView('myWork')} />;
+  if (view === 'adultView') {
+    return (
+      <AdultView
+        uid={authUser.uid}
+        childId={activeChild.id}
+        childName={activeChild.name}
+        onBack={() => setView('task')}
+      />
+    );
   }
 
-  return <Step step={step} pending={pending} onDone={handleDone} onTooBig={handleTooBig} />;
+  if (assignment === null) {
+    return (
+      <Entry
+        onStart={handleStart}
+        onMyWork={() => setView('myWork')}
+        onProgress={() => setView('adultView')}
+      />
+    );
+  }
+
+  return (
+    <Step
+      step={step}
+      pending={pending}
+      onDone={handleDone}
+      onTooBig={handleTooBig}
+      workSoFar={workSoFar}
+      onWorkSoFarChange={setWorkSoFar}
+    />
+  );
 }

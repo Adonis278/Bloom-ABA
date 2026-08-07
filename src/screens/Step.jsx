@@ -24,8 +24,15 @@ const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in wi
    crossfades to a single flat line instead of a spinner — see CLAUDE.md
    "Waiting states" for why a spinner is wrong for this population. It's the
    one 450ms crossfade the motion budget allows, used twice: once into
-   "Reading it.", once out into the step. */
-export default function Step({ step, pending, onDone, onTooBig }) {
+   "Reading it.", once out into the step.
+
+   The workspace textarea below the step is the first real text-input
+   surface here — CLAUDE.md "Stall detection" records it as a deliberate,
+   scoped decision, not drift from hard rule 3. `workSoFar` is owned by
+   App.jsx (cumulative across the whole assignment, feeds the LLM); this
+   component only renders it. It's hidden during the very first load since
+   there's nothing to work on yet. */
+export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWorkSoFarChange }) {
   const isFirstLoad = pending && !step;
   const [showSecondLine, setShowSecondLine] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -85,6 +92,17 @@ export default function Step({ step, pending, onDone, onTooBig }) {
             )}
           </Crossfade>
         </div>
+
+        {!isFirstLoad && (
+          <textarea
+            aria-label="Work here if you want to"
+            rows={5}
+            value={workSoFar}
+            onChange={(e) => onWorkSoFarChange(e.target.value)}
+            placeholder="Work here if you want to."
+            className="card-lit mt-6 w-full resize-none px-5 py-4 text-[0.9375rem] leading-[1.55] text-ink outline-none placeholder:text-muted"
+          />
+        )}
 
         <div className="mt-10 flex flex-wrap gap-3">
           <button

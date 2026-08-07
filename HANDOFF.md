@@ -1,4 +1,76 @@
-# Handoff — kindergarten scope, child picker, marketing removed (NOT yet deployed)
+# Handoff — premade assignment + stall detection (NOT yet deployed)
+
+**Newest pass — read this before anything below.** The live deployed version
+(https://bloom-aba.web.app) is one step behind this: it still has a blank
+Entry textarea and no stall detection at all. This pass, on request, builds
+the two things every previous handoff explicitly deferred to "the next
+co-design pass":
+
+1. **`Entry.jsx` opens pre-filled** with a real assignment (a summer-break
+   reflection for English class) instead of a blank box — still just a
+   `useState` initial value, fully editable. See CLAUDE.md "Premade
+   assignment".
+2. **Real silent-stall detection**, spec.md Part 2, actually built for the
+   first time: `src/lib/scoring.js` (the formula, verbatim from spec.md/
+   DESIGN.md), `src/hooks/useStuckDetector.js` (collects the counts),
+   escalation folded into `App.jsx` (auto-shrink on a genuine stall, fading
+   after two independent completions), and real Firestore logging via the
+   new `src/lib/sessions.js` under a nested `children/{childId}/sessions/...`
+   schema — replacing the older flat `sessions/{sid}` block in
+   `firestore.rules` that predated the child model and was never written to.
+   Full detail in CLAUDE.md "Stall detection".
+   - **Explicitly not built**, confirmed with the user before starting:
+     modality auto-switch (DESIGN.md's stall #2) and a break-offer screen
+     (stall #3) — both need their own product decision and new UI, not a
+     silent bundle into this pass.
+
+## What's verified, and how
+
+- `npm run build` passes clean.
+- **Scripted verification against the real Firestore + Auth emulators**
+  (client SDK, real ID tokens for two distinct test users — not raw REST,
+  same lesson as the Storage-rules near-miss below): owner can write
+  session/step docs under their own child; a *different* signed-in user is
+  denied both read and write on those same docs; every written step doc
+  contains only the documented count/metadata fields (no draft text) —
+  hard rule 7, checked directly against what actually landed in the
+  emulator, not inferred from the code. 16/16 checks passed, including
+  `computeStuckScore`/`isGateOpen`/`medianOf` against concrete inputs and
+  `buildPrompt`'s new `silent_stall` reason text.
+
+## What's NOT verified — the live click-through UI, again
+
+Same limitation as the previous pass below, now confirmed under
+**`claude-in-chrome` too, not just the sandboxed browser tool**: clicking
+"Sign in with Google" against `http://localhost:5173` (Auth emulator
+connected) opened *something* — the button flipped to "Signing in…" and
+the click briefly stole the whole tab group's focus — but the resulting
+popup never appeared as a tab this harness could see or drive, and the
+click eventually reset with no error shown (hard rule 1 working as
+designed, not evidence of success). This reproduced identically on a
+second, clean attempt. Given the previous pass's note that the *sandboxed*
+browser failed for a different, diagnosed reason (`Auth Emulator Internal
+Error: No matching frame`, a real popup-vs-navigation protocol mismatch),
+and this pass fails silently under the *real* Chrome tool with no error
+message at all, treat this as a still-open harness gap rather than assuming
+the same root cause — worth a fresh look next time rather than re-attempting
+the exact same approach.
+
+**This means the actual click-through was not done live this session**:
+typing into the new workspace textarea with real multi-second pauses,
+watching a step visibly shrink without pressing Too Big, watching the level
+fade back down after two clean Dones. The backend logic behind all of that
+was verified directly (above); the on-screen behavior was not. **Click
+through this yourself before demoing**: `npm run emulators` +
+`npm run dev`, sign in, Start on the pre-filled assignment, type a few
+words into the workspace box, then stop and wait — the step should replace
+itself within a few seconds without touching Too Big. Check the Firestore
+Emulator UI (`http://127.0.0.1:4000/firestore`) for the `outcome:'shrunk'`
+step doc it should have logged.
+
+---
+
+# Handoff — kindergarten scope, child picker, marketing removed (deployed, one pass behind the above)
 
 **Newest pass — read this before anything below.** The live deployed version
 (https://bloom-aba.web.app) is one step behind this: it still shows the
@@ -372,9 +444,15 @@ asking, and I'd ask first next time rather than reach for it again.
 
 ## Not this session, for the next co-design pass (DESIGN.md §11 build order)
 
-- `useStuckDetector` — keystroke timing + interaction scoring, gated on
-  sentence boundaries. Nothing here yet.
-- Firestore step logging (`sessions/{sid}/steps/{stepId}`) — rules exist,
-  nothing writes to them.
-- Rules screen, accessibility controls (tint/scale/weight), read-aloud.
+**Update — `useStuckDetector` and Firestore step logging were built in the
+"premade assignment + stall detection" pass at the top of this file.** What's
+still genuinely not built:
+
+- Modality auto-switch (stall #2) and a break-offer screen (stall #3) —
+  DESIGN.md's fuller escalation ladder, deliberately deferred.
+- `too_vague`/`missing_prereq` reject buttons (spec F11) — only Too Big
+  exists as a UI control today.
+- Rules screen, accessibility controls (tint/scale/weight) beyond read-aloud.
 - `recomputeSummary`, Summary screen, AdultView, share codes.
+- Marking a session `ended`/`outcome` on the session doc — there's no
+  "assignment finished" signal in the app yet, so those fields stay `null`.
