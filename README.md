@@ -1,9 +1,12 @@
 # Bloom
 
 **One next physical action, sized to the student.** A task-initiation tool for
-students with ADHD (grades 6–9). Paste an assignment, get one step. Say it's
-too big, get a smaller one. No account, no dashboard, no list of steps — just
-the one thing to do next.
+students with ADHD (grades 6–9). Start an assignment, get one step. Say it's
+too big, get a smaller one. Go quiet because you're stuck, and the tool
+notices on its own and quietly makes the next step smaller. No dashboard for
+the student, no list of steps — just the one thing to do next.
+
+**Live:** https://bloom-aba.web.app
 
 Built for **Track 1, IncludAI 2026**. Full product context is in
 [`docs/BRD.md`](docs/BRD.md), [`docs/DESIGN.md`](docs/DESIGN.md), and
@@ -16,22 +19,52 @@ Built for **Track 1, IncludAI 2026**. Full product context is in
 
 ## What's built
 
-This is the MVP loop — the smallest version of the product that's actually
-useful:
+**The student loop**
 
-- **Entry screen** — one textarea, one Start button. Nothing else.
-- **Step screen** — one lit card, one step, `[Done]` `[Too big]`.
-- **`generateStep`** — a Cloud Function that turns an assignment into one
-  physical, zero-decision, ≤25-word action, validates its own output, and
-  regenerates if a step breaks a rule.
+- **Entry** — one textarea, pre-filled with a real assignment so the tool can
+  be used without typing anything first. Fully editable.
+- **Step** — one lit card, one step, a workspace to actually write in, and
+  `[Done]` `[Too big]` `[Listen]` (read-aloud via the browser's own speech
+  synthesis — no cloud call, explicit action only, never auto-plays).
+- **Steps follow the student's draft, not a fixed decomposition.** The
+  assignment is never broken into a step list up front. Each step is generated
+  from what is actually on the page at that moment — a student who writes four
+  paragraphs off one step gets a step that continues from *there*.
+  `functions/draftMap.js` reads position deterministically (paragraph and
+  sentence counts, whether the draft breaks off mid-sentence) and hands the
+  model facts rather than asking it to infer them from prose.
+- **Silent-stall detection.** Keystroke *timing* — never content — feeds the
+  scoring formula in `src/lib/scoring.js`. When a student goes quiet and the
+  score crosses the threshold at a sentence boundary or a genuine pause, the
+  next step gets smaller on its own, with no button pressed. Two independent
+  completions fade the demand back up.
+- **A worked example when stuck.** After a stall or a rejected step, one
+  concrete sentence the student could actually write appears under the step.
+  Never on a step they're moving through fine.
+
+**Behind it**
+
+- **`generateStep`** — Cloud Function producing one physical, zero-decision,
+  ≤25-word action; validates its own output and regenerates on a rule break.
+- **`generateExample`** — a second, separate callable so the step never waits
+  on it.
 - **A failsafe model chain** (NVIDIA → NVIDIA → Anthropic) so one provider
   having a bad day doesn't take the app down with it.
-- **Anonymous auth only.** No sign-up, no email, no login screen.
+- **Google sign-in by an adult, child selected afterward.** The adult
+  authenticates (pure device trust — nothing about them is stored, not even a
+  name); the actual student is picked from `ChildPicker`. One account covers
+  siblings or a shared classroom device.
+- **My work** — history of completed steps and uploaded files, per child.
+- **Progress** — an adult-facing view of four metrics (prompt level over time,
+  stall recovery, an honestly-labeled completion proxy, time-to-first-
+  keystroke), computed live from the child's own session data and returning
+  only aggregates — never assignment or step content.
 
-Not built yet, on purpose — see [`HANDOFF.md`](HANDOFF.md) for the full state
-and what's next: stall detection, Firestore logging, the rules screen,
-accessibility controls, the summary, the adult view. The camera is out of
-scope permanently (see `docs/spec.md` → Open Decisions).
+**Not built, deliberately** — modality auto-switch, the break-offer screen,
+the student-granted share-code flow for a second adult, accessibility controls
+beyond read-aloud, and any real "assignment finished" signal. See
+[`HANDOFF.md`](HANDOFF.md). The camera is out of scope permanently
+(`docs/spec.md` → Open Decisions).
 
 **The rules this app is built against are non-negotiable, not preferences.**
 Read [`CLAUDE.md`](CLAUDE.md) before touching UI or generation logic — no red
@@ -44,25 +77,37 @@ an oversight.
 
 ## Stack
 
-React (Vite) + Tailwind · Firebase (Auth, Firestore, Functions, Hosting) ·
-NVIDIA NIM + Anthropic for generation.
+React (Vite) + Tailwind · Firebase (Auth, Firestore, Functions, Hosting,
+Storage) · NVIDIA NIM + Anthropic for generation. No charting library — the
+trend charts are hand-rolled SVG.
 
 ```
 src/
-  App.jsx                 screen state + step engine (in-memory this milestone)
-  screens/Entry.jsx        the textarea
-  screens/Step.jsx         the lit card
+  App.jsx                  screen state, task loop, escalation + fading
+  screens/LandingPage.jsx  sign-in, the one surface with ambient motion
+  screens/ChildPicker.jsx  which student is using it
+  screens/Entry.jsx        the assignment textarea
+  screens/Step.jsx         the lit card, workspace, example, read-aloud
+  screens/MyWork.jsx       history + uploads
+  screens/AdultView.jsx    the four metrics, mono readout
   components/Crossfade.jsx the one 450ms transition the motion budget allows
-  lib/firebase.js          init, anonymous auth, emulator wiring
-  lib/generateStep.js      callable wrapper
+  components/TrendChart.jsx hand-rolled SVG line chart
+  hooks/useStuckDetector.js keystroke TIMING only — never content
+  lib/scoring.js           the stall formula (spec.md Part 2)
+  lib/sessions.js          per-step logging (counts and timestamps only)
+  lib/analytics.js         live aggregation; structurally cannot return content
+  lib/profile.js           adult profile + children + expectedSeconds
+  lib/history.js  lib/uploads.js  lib/firebase.js  lib/generateStep.js
   index.css                design tokens (DESIGN.md §9) — never hardcode a color
 
 functions/
-  index.js                 onCall handler, secrets binding
+  index.js                 onCall handlers, secrets binding
   core.js                  retry/validation/fallback orchestration
   prompt.js                prompt construction (spec.md Part 3)
-  validate.js               the step-rules gate
-  providers/                NVIDIA + Anthropic callers, and the failsafe chain
+  draftMap.js              deterministic read of where the draft stops
+  example.js               the worked-example callable
+  validate.js              the step-rules gate
+  providers/               NVIDIA + Anthropic callers, and the failsafe chain
 ```
 
 ---
@@ -90,7 +135,7 @@ live (and failing) call to Google Secret Manager on every request. See
 Start both emulators and the dev server:
 
 ```bash
-firebase emulators:start --only functions,auth --project bloom-aba
+npm run emulators   # functions, hosting, firestore, auth, storage
 npm run dev
 ```
 
@@ -117,8 +162,14 @@ Open `http://localhost:5173`. Paste an assignment, hit Start.
 npm run build
 firebase functions:secrets:set NVIDIA_API_KEY
 firebase functions:secrets:set ANTHROPIC_API_KEY   # optional third fallback tier
-firebase deploy --only hosting,functions
+firebase deploy
 ```
+
+Firestore, Storage, and Authentication each need to be initialized once in the
+Firebase console before their first deploy — `firebase deploy` fails with a
+clear "has not been set up" message until you do. All three are provisioned on
+`bloom-aba`; Storage uses a no-cost regional bucket with our own rules
+(`storage.rules`) deployed over the locked-down default.
 
 Firebase project is `bloom-aba` (see `.firebaserc`). `.env` at the repo root
 holds the public web config (API key, project ID, etc.) — this is safe to
@@ -142,7 +193,17 @@ dyslexic readers, so body text sits at 10–14:1, not 21:1. Never hardcode a
 color in a component — add a token instead.
 
 Type is **Atkinson Hyperlegible** (student surface, self-hosted, no font-CDN
-request) and **IBM Plex Mono** (adult dashboard, not built yet).
+request) and **IBM Plex Mono** (the adult Progress view — deliberately plainer,
+flat rows and hairlines, no cards; it's an instrument readout, not the
+product).
+
+The student's workspace also carries `spellCheck="false"` and
+`data-gramm="false"`. Found by testing on a real machine: Grammarly attaches
+to that textarea and draws **red squiggles under the student's own
+sentences** — exactly the corrective red-ink signal this product exists to
+avoid, on the one surface where they're being asked to take a risk. Our CSS
+can't reach it; opting the field out can. Keep these on any future student
+writing surface.
 
 ---
 
@@ -157,6 +218,35 @@ times out past 20 seconds. If you change the chain, re-measure — don't
 reorder from intuition. The full benchmark table is in `HANDOFF.md`.
 
 ---
+
+## Where this stands
+
+Deployed and working end to end at https://bloom-aba.web.app. Verified by
+driving the live site as a student: start an assignment, type a partial draft,
+go quiet, and watch the step shrink on its own and a worked example appear —
+plus scripted checks against the Firestore emulator confirming step documents
+hold only counts and timestamps, and that a second signed-in account is denied
+access to another's data.
+
+**Honest about what isn't proven.** No neurodivergent student has used this
+yet — every "student" in testing so far has been a scripted browser. Per
+`docs/BRD.md` §10 that evidence (baseline run, intervention run, minimum three
+users, failures reported) is the work that matters most, and it hasn't
+happened.
+
+**Known limitations**, in priority order:
+
+1. **Step quality is bimodal.** When the tier-1 model answers (~1s) steps are
+   sharp and well-anchored to the draft. When it exceeds its 4s timeout, the
+   8B fallback produces noticeably weaker steps. Measured ~6/8 under 4s. The
+   fix is a stronger tier-1 model, not more prompt text — re-measure before
+   changing the chain.
+2. **Recognizing "the draft is long enough, write the ending"** is the least
+   reliable behaviour. Position-tracking and forward-only hold up
+   consistently; ending-recognition degrades on the fallback tier.
+3. **No assignment-completion signal exists.** The Progress view's completion
+   number is a labeled proxy (did the session's last step end cleanly), not
+   true completion tracking.
 
 ## License / status
 

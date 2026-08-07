@@ -79,9 +79,17 @@ export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWor
   const phase = isFirstLoad ? (showSecondLine ? 'reading-2' : 'reading-1') : step;
 
   return (
-    <main className="min-h-dvh grid place-items-center px-6 py-16">
-      <div className="card-lit w-full max-w-[620px] px-8 py-10">
-        <div aria-live="polite">
+    /* The card never grows past the viewport, so Done and Too big are always
+       reachable without scrolling. Everything except the workspace is
+       fixed-height; the workspace is the one element that gives up space
+       (min-h-0 lets it actually shrink inside a flex column) and scrolls
+       internally instead. Found in live testing: once an example is showing,
+       step + example + a fixed 5-row textarea + buttons ran past a laptop
+       screen, putting the buttons below the fold at the exact moment the
+       student is most stuck. */
+    <main className="grid min-h-dvh place-items-center px-6 py-6 sm:py-10">
+      <div className="card-lit flex max-h-[calc(100dvh-3rem)] w-full max-w-[620px] flex-col px-8 py-8">
+        <div className="shrink-0" aria-live="polite">
           <Crossfade phase={phase}>
             {isFirstLoad ? (
               <p className="text-[1.0625rem] leading-[1.55] text-muted">
@@ -99,7 +107,7 @@ export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWor
             itself is the one bold thing, so the eye lands on the words they
             can actually use. */}
         {!isFirstLoad && example && (
-          <div className="mt-8 border-t border-line pt-5">
+          <div className="mt-6 shrink-0 border-t border-line pt-4">
             <p className="mb-2 text-[0.8125rem] text-muted">One way it could look:</p>
             <p className="text-[1.0625rem] font-bold leading-[1.55] text-ink">{example}</p>
             <p className="mt-2 text-[0.8125rem] text-muted">Copy it, or change any part.</p>
@@ -109,7 +117,6 @@ export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWor
         {!isFirstLoad && (
           <textarea
             aria-label="Work here if you want to"
-            rows={5}
             value={workSoFar}
             onChange={(e) => onWorkSoFarChange(e.target.value)}
             placeholder="Work here if you want to."
@@ -124,11 +131,13 @@ export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWor
             spellCheck="false"
             data-gramm="false"
             data-enable-grammarly="false"
-            className="card-lit mt-6 w-full resize-none px-5 py-4 text-[0.9375rem] leading-[1.55] text-ink outline-none placeholder:text-muted"
+            /* Wants 8rem, will grow into spare room, and gives space back
+               down to 4.5rem before the buttons would be pushed off screen. */
+            className="card-lit mt-6 min-h-[4.5rem] w-full flex-[1_1_8rem] resize-none overflow-y-auto px-5 py-4 text-[0.9375rem] leading-[1.55] text-ink outline-none placeholder:text-muted"
           />
         )}
 
-        <div className="mt-10 flex flex-wrap gap-3">
+        <div className="mt-6 flex shrink-0 flex-wrap gap-3">
           <button
             type="button"
             onClick={() => stopSpeakingThen(onDone)}
