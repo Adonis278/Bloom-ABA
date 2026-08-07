@@ -104,6 +104,47 @@ no decision word. It would have gone to a student. A step must also name an
 object, so reject anything under ~4 words and regenerate. The word cap is not
 the only way a step can be useless.
 
+**Steps follow the student's draft, not a fixed decomposition.** The
+assignment is never broken into a step list up front — each step is
+generated from what is actually on the page at that moment. A student who
+writes four paragraphs off one step is further along than the step count
+implies, and the next step has to start from *there*, not from wherever a
+sequence says they should be.
+
+`functions/draftMap.js` does the positional read deterministically —
+paragraph/sentence/word counts, whether there's a title, and whether the
+draft breaks off mid-sentence — and `prompt.js` passes it as `STRUCTURE`
+alongside a `STOPPED HERE` tail of the last ~240 characters. **This is plain
+counting on purpose.** Measured: asked to infer its own position from several
+paragraphs of prose, the model anchors on early content and returns a step
+for a section the student already finished — it told a student who had
+written through their campfire paragraph to write more about the boat, and
+in one case to "read the draft from the beginning," sending a stuck student
+backward. Facts it cannot misread fixed both.
+
+Rules that came out of measuring against the live models, all load-bearing:
+- **Forward only.** Lowering the demand on a stall means a *smaller* piece of
+  the same next thing, never a backward or passive one. Without this stated
+  explicitly, "drop the demand" gets read as "have them re-read what they
+  wrote" — the classic avoidance trap this product exists to avoid.
+- **Same page, no new materials.** No dictionaries, websites, or separate
+  sheets. Observed repeatedly on the fallback tier otherwise.
+- **Mid-sentence is an override**, not an inference — when `endsMidSentence`
+  is true the step is to finish that one sentence, stated before all other
+  guidance. Without it the models latch onto the dangling final word.
+
+**Keep this prompt short.** It was cut from ~640 tokens back to ~340 after
+the long version routinely pushed tier-1 generation past its 4000ms timeout
+— which silently downgrades to the flatter tier-2 model and produces *worse*
+steps than the extra instruction buys. Re-measure tier-1 latency before
+adding to it.
+
+**Honest limitation:** "the draft is long enough, switch to writing the
+ending" is the least reliable of these. Position-tracking and forward-only
+hold up consistently across runs; ending-recognition works on tier 1 but
+often degrades to a generic "write the next sentence" on the fallback tier.
+Worth revisiting with a stronger tier-1 model rather than more prompt text.
+
 **Prompt levels 0–4:**
 0 independent · 1 exact starting words · 2 literal words to type ·
 3 three options to pick from · 4 full text to copy and alter one word

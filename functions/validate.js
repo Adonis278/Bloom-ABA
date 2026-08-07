@@ -35,6 +35,9 @@ export function validateStep(raw) {
     .trim()
     // Strip wrapping quotes/markdown/bullets a model sometimes adds despite
     // "return ONLY the step text" — this is cleanup, not a validation check.
+    // The numbered form ("3. Write one sentence...") shows up when a fallback
+    // tier treats the request as "continue the step list"; observed live.
+    .replace(/^\d+[.)]\s*/, '')
     .replace(/^[-*•]\s*/, '')
     .replace(/^["'“”]+|["'“”]+$/g, '')
     .trim();
