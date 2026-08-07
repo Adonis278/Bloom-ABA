@@ -41,6 +41,14 @@ Built for **Track 1, IncludAI 2026**. Full product context is in
 - **A worked example when stuck.** After a stall or a rejected step, one
   concrete sentence the student could actually write appears under the step.
   Never on a step they're moving through fine.
+- **Assignments end.** `functions/target.js` reads a target length off the
+  assignment ("about 60 words", "one page") and derives a phase from the
+  draft. Near the target the step changes character on its own — from "write
+  the next sentence" to "write a closing sentence" — and once the target is
+  met with the last sentence closed, the loop stops and the session is marked
+  complete. Without this, "write the next sentence" is forever a valid next
+  step and the tool never stops asking. The target never appears on screen:
+  hard rule 6 forbids progress percentages.
 
 **Behind it**
 
@@ -241,12 +249,15 @@ happened.
    8B fallback produces noticeably weaker steps. Measured ~6/8 under 4s. The
    fix is a stronger tier-1 model, not more prompt text — re-measure before
    changing the chain.
-2. **Recognizing "the draft is long enough, write the ending"** is the least
-   reliable behaviour. Position-tracking and forward-only hold up
-   consistently; ending-recognition degrades on the fallback tier.
-3. **No assignment-completion signal exists.** The Progress view's completion
-   number is a labeled proxy (did the session's last step end cleanly), not
-   true completion tracking.
+2. **The target length is a heuristic.** `target.js` reads "60 words" or "one
+   page" off the assignment text and defaults to 120 words when it can't
+   tell. It decides when to switch to wrap-up language and when to stop — it
+   is not anything a student is graded against. An assignment phrased in a
+   way it doesn't recognise gets the default.
+3. **Only word count ends the loop.** A student who writes 60 words of
+   something unrelated will still be told the assignment is finished. Judging
+   whether the content actually answers the prompt is a different problem and
+   isn't built.
 
 ## License / status
 

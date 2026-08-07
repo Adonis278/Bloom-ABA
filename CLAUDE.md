@@ -333,6 +333,43 @@ punctuation. Verified directly: a scripted check against the Firestore
 emulator confirmed every written step doc contains only the fields listed
 above, nothing resembling draft content.
 
+## Ending an assignment
+
+**The loop needs a finish line.** "Write the next sentence" is forever a valid
+next step, so without one the tool keeps asking for another sentence after the
+assignment is genuinely done. `functions/target.js` reads a target word count
+off the assignment text ("about 60 words", "one page" → 250, "a paragraph" →
+60, default 120) and derives a phase from the draft's own word count:
+
+| Phase | When | What the step becomes |
+|---|---|---|
+| `building` | under 85% of target | the normal next-action guidance |
+| `ending` | ≥85% of target, or over target but mid-sentence | write the closing sentence that wraps the piece up |
+| `complete` | at/over target **and** the last sentence is closed | no step at all — the loop ends |
+
+`core.js` checks this **before any model call**: when it's complete there is
+nothing to generate, so it returns `{ step: null, complete: true }` in 0ms
+rather than paying the latency to find out. `App.jsx` shows a flat finish
+screen and `finishSession()` writes `endedAt`/`outcome: 'completed'`.
+
+The ending phase deliberately starts *before* the target is reached — a
+student told to "write the ending" at exactly 60/60 words has already written
+past the point where an ending would have fit.
+
+**This also replaced a vague prompt instruction with a computed one.** The
+model used to be asked to judge for itself whether the draft was "long
+enough", which it did unreliably, usually defaulting to "write the next
+sentence" forever. Telling it which phase it is in is both shorter and more
+reliable — it fixed the ending-recognition limitation noted above.
+
+**The target never reaches the screen.** Hard rule 6 forbids progress
+percentages: no bar, no counter, no "42 of 60 words". It steers generation and
+ends the loop, nothing else.
+
+**This also makes the Progress view's completion metric real** rather than the
+proxy it used to be. Sessions predating the finish line have `outcome: null`
+and still fall back to the old proxy — `analytics.js` handles both.
+
 ## Worked examples when stuck
 
 `generateExample` (`functions/example.js`) returns one concrete sentence the

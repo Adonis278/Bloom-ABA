@@ -1,4 +1,5 @@
 import { mapDraft, describeDraft } from './draftMap.js';
+import { targetWordsFor, assignmentPhase } from './target.js';
 
 /* Prompt construction — spec.md Part 3.
 
@@ -52,7 +53,6 @@ const MID_SENTENCE_OVERRIDE = [
 const DRAFT_READING = [
   'Continue the draft from STOPPED HERE — that is exactly where they ran out.',
   'The draft, not the step list, says where they are. Never repeat or send them back to a part they already wrote.',
-  'If STRUCTURE shows several full paragraphs and the ideas are covered, the missing part is THE ENDING: ask for the closing sentence, not more middle.',
   'Never tell them to read, re-read, review, or think about what they wrote, and never send them to a dictionary, website, separate sheet, or other material. Everything happens on the page they are already writing on.',
   'Name their real subject — the thing their last line is actually about.',
 ];
@@ -71,6 +71,17 @@ function draftTail(text) {
 
 const NO_DRAFT_NOTE =
   'The draft is empty. Give a step that gets the first words onto the page — the smallest real beginning, not planning or thinking.';
+
+/* Replaces an earlier instruction that asked the model to judge for itself
+   whether the draft was "long enough" — which it did unreliably, usually
+   defaulting to "write the next sentence" forever. The phase is computed in
+   target.js now, so the model is told which one it is instead of guessing.
+   Shorter prompt AND a more reliable answer. */
+const PHASE_SPEC = {
+  building: null, // no extra instruction — the default guidance already covers it
+  ending:
+    'THE DRAFT IS NEARLY LONG ENOUGH. The missing piece is THE ENDING. The step is to write the closing sentence that wraps the whole piece up — a last thought about what it meant or how it turned out. Do not ask for more middle.',
+};
 
 const RETRY_HINTS = {
   too_short: 'Your last answer was too vague. Name the exact thing to open, type, write, or find — not just the verb.',
@@ -92,8 +103,21 @@ export function buildPrompt({ assignment, workSoFar, completedSteps, promptLevel
 
   // The draft-reading instruction is skipped on the very first step: there is
   // no draft yet, and the first step is preparatory by design.
+  const phase = map
+    ? assignmentPhase({
+        wordCount: map.wordCount,
+        endsMidSentence: map.endsMidSentence,
+        target: targetWordsFor(assignment),
+      })
+    : 'building';
+  const phaseLine = PHASE_SPEC[phase];
+
   const draftGuidance = hasDraft
-    ? [...(map?.endsMidSentence ? MID_SENTENCE_OVERRIDE : []), ...DRAFT_READING]
+    ? [
+        ...(map?.endsMidSentence ? MID_SENTENCE_OVERRIDE : []),
+        ...(phaseLine ? [phaseLine] : []),
+        ...DRAFT_READING,
+      ]
     : [NO_DRAFT_NOTE];
   const readDraft = reason === 'first' ? [] : [...draftGuidance, ''];
 

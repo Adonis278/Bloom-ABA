@@ -9,9 +9,13 @@ const callable = httpsCallable(functions, 'generateStep');
    No auth wait here anymore: App.jsx only renders the Entry/Step flow once
    onAuthStateChanged has already fired with a real user (see App.jsx), so a
    signed-in uid is guaranteed by the time this is called. */
+/* Returns { step, complete }. `complete` is the loop's finish line: the
+   assignment has reached the length it asked for and the last sentence is
+   closed, so there is no next step to give. Without it the tool would keep
+   asking for "the next sentence" forever. */
 export async function generateStep({ assignment, workSoFar, completedSteps, promptLevel, reason }) {
   const { data } = await callable({ assignment, workSoFar, completedSteps, promptLevel, reason });
-  return data.step;
+  return { step: data.step ?? null, complete: Boolean(data.complete) };
 }
 
 const exampleCallable = httpsCallable(functions, 'generateExample');

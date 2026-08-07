@@ -1,6 +1,8 @@
 import { generate } from './providers/index.js';
 import { buildPrompt, buildRetryHint } from './prompt.js';
 import { validateStep } from './validate.js';
+import { mapDraft } from './draftMap.js';
+import { targetWordsFor, assignmentPhase } from './target.js';
 
 /* Split from index.js so this logic is testable without a deployed or
    emulated onCall wrapper — just call runGenerateStep(input, keys) directly. */
@@ -23,6 +25,21 @@ export async function runGenerateStep(input, keys) {
     promptLevel = 0,
     reason = 'next',
   } = input ?? {};
+
+  /* The loop needs a finish line. Without one "write the next sentence" is
+     forever a valid next step, so the tool would keep asking for one after
+     the assignment is genuinely done. Checked before any model call — when
+     it's finished there is nothing to generate, and no reason to spend the
+     latency or the tokens finding that out. */
+  const map = mapDraft(workSoFar);
+  if (map && reason !== 'first') {
+    const phase = assignmentPhase({
+      wordCount: map.wordCount,
+      endsMidSentence: map.endsMidSentence,
+      target: targetWordsFor(assignment),
+    });
+    if (phase === 'complete') return { step: null, complete: true };
+  }
 
   let best = null;
   let retryHint = null;
@@ -49,7 +66,7 @@ export async function runGenerateStep(input, keys) {
 
     const checked = validateStep(raw);
     if (!best || scoreCandidate(checked) < scoreCandidate(best)) best = checked;
-    if (checked.valid) return { step: checked.text };
+    if (checked.valid) return { step: checked.text, complete: false };
 
     retryHint = buildRetryHint(checked.problems);
   }
@@ -58,5 +75,5 @@ export async function runGenerateStep(input, keys) {
      Hard rule 1: there is no error state. This function always resolves to
      a step a student can act on — the least-wrong candidate seen, or the
      fixed fallback if the provider chain never returned text at all. */
-  return { step: best ? best.text : FALLBACK_STEP };
+  return { step: best ? best.text : FALLBACK_STEP, complete: false };
 }
