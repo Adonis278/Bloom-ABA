@@ -49,6 +49,12 @@ Built for **Track 1, IncludAI 2026**. Full product context is in
   complete. Without this, "write the next sentence" is forever a valid next
   step and the tool never stops asking. The target never appears on screen:
   hard rule 6 forbids progress percentages.
+- **Length alone can't finish an assignment.** A single relevance call
+  (`functions/relevance.js`) gates the ending, so 60 words about the wrong
+  subject redirects to the assignment instead of reaching the finish screen.
+  It's biased toward letting the student's work stand — a false "off topic"
+  would tell someone who did the work that it didn't count, which is worse
+  than a missed catch.
 
 **Behind it**
 
@@ -254,10 +260,11 @@ happened.
    tell. It decides when to switch to wrap-up language and when to stop — it
    is not anything a student is graded against. An assignment phrased in a
    way it doesn't recognise gets the default.
-3. **Only word count ends the loop.** A student who writes 60 words of
-   something unrelated will still be told the assignment is finished. Judging
-   whether the content actually answers the prompt is a different problem and
-   isn't built.
+3. **Off-topic drafts are only caught at the finish line.** A relevance check
+   gates completion, so 60 words about the wrong subject redirects instead of
+   finishing — but a student drifting at 20 words isn't checked until they
+   cross the target. Catching drift earlier costs a model call per step
+   against the latency budget; that tradeoff hasn't been taken.
 
 ## License / status
 

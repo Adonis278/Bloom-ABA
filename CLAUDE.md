@@ -362,6 +362,43 @@ enough", which it did unreliably, usually defaulting to "write the next
 sentence" forever. Telling it which phase it is in is both shorter and more
 reliable — it fixed the ending-recognition limitation noted above.
 
+**Length alone cannot end an assignment.** 60 words about mitochondria would
+otherwise reach the finish screen. `functions/relevance.js` is a single
+classification call — is this draft an attempt at this assignment, ON or OFF —
+and it gates the `complete` phase. Off-topic becomes a fourth phase,
+`redirect`, instead of finishing.
+
+**This is one call, not an agent, and that is deliberate.** The question is
+bounded and its shape is known: there is nothing to explore, no sequence to
+discover, no tools to choose between. An agent loop would only multiply
+latency against a budget that already loses ~2 in 8 tier-1 calls to timeout,
+and every timeout drops generation to the flatter model — more reasoning turns
+would make the output *worse* here. It runs once per assignment, at the moment
+the loop would end, where nothing is waiting on it.
+
+**It is biased toward letting the work stand.** The two failure modes are not
+equal: missing an off-topic draft is a missed catch, but telling a student who
+did the work that it doesn't count is the exact experience this product exists
+to prevent. A failed call, an empty completion, an unparseable answer, or any
+hedge all resolve to on-topic. Verified against the live models: a messy
+misspelled draft and an unusual "I stayed home all summer" angle both
+correctly pass.
+
+**The redirect phase replaces the draft-reading guidance rather than adding to
+it, and withholds the draft entirely.** Measured, both mattered: with the
+off-topic text still in the prompt the model anchored on it regardless of
+instructions, producing "write a sentence that summarizes what you learned
+about cells" — pushing the student *further* off the assignment. Removing just
+the `STOPPED HERE` tail was not enough; the verbatim block is the anchor. The
+`REASON` line is overridden too, since every reason tells the model to
+continue the draft. The step also never mentions that the draft was wrong
+(hard rule 1 — a step that didn't work is quietly replaced, never marked).
+
+**Known gap: an off-topic draft is only caught at the finish line.** A student
+drifting at 20 words isn't checked until they cross the target. Catching drift
+earlier would mean running the check during the loop, which costs a call per
+step against the latency budget — a real tradeoff, not an oversight.
+
 **The target never reaches the screen.** Hard rule 6 forbids progress
 percentages: no bar, no counter, no "42 of 60 words". It steers generation and
 ends the loop, nothing else.
