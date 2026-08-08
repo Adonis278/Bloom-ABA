@@ -8,13 +8,40 @@
 
 :root {
   color-scheme: light;
+  --color-bg: 250 250 247;
+  --color-surface: 242 239 230;
+  --color-hairline: 227 220 203;
+  --color-sand: 220 201 174;
+  --color-ink: 31 36 34;
+  --color-accent: 74 109 104;
+  --color-quiet: 91 100 114;
+  --color-trail: 184 178 160;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --color-bg: 27 31 29;
+  --color-surface: 36 42 39;
+  --color-hairline: 58 66 61;
+  --color-sand: 74 66 56;
+  --color-ink: 242 240 234;
+  --color-accent: 82 118 112;
+  --color-quiet: 154 165 160;
+  --color-trail: 107 99 85;
 }
 
 body {
   margin: 0;
-  background-color: #FAFAF7;
-  color: #1F2422;
+  background-color: rgb(var(--color-bg));
+  color: rgb(var(--color-ink));
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body {
+    transition: none;
+  }
 }
 
 /* Step text cross-fade: user-triggered only (keyed remount on step change),

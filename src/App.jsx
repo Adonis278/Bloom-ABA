@@ -7,6 +7,34 @@ import Settings from './components/Settings.jsx'
 import SharingPanel from './components/SharingPanel.jsx'
 import { getNextStep } from './lib/stepEngine.js'
 import { getSettings, setSettings, getSharing, setSharing } from './lib/storage.js'
+import { getInitialTheme, applyTheme } from './lib/theme.js'
+
+function SunIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.5" stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M12 2.5v2.5M12 19v2.5M21.5 12H19M5 12H2.5M18.5 5.5l-1.8 1.8M7.3 16.7l-1.8 1.8M18.5 18.5l-1.8-1.8M7.3 7.3 5.5 5.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function MoonIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 const initialState = {
   view: 'entry',
@@ -57,6 +85,7 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [settings, setSettingsState] = useState(getSettings)
   const [sharing, setSharingState] = useState(getSharing)
+  const [theme, setTheme] = useState(getInitialTheme)
 
   useEffect(() => {
     setSettings(settings)
@@ -65,6 +94,10 @@ export default function App() {
   useEffect(() => {
     setSharing(sharing)
   }, [sharing])
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
 
   async function handleSubmitAssignment(text) {
     dispatch({ type: 'SUBMIT_ASSIGNMENT', assignmentInput: text })
@@ -103,7 +136,15 @@ export default function App() {
   return (
     <div className="font-chrome">
       {showCorner && (
-        <div className="fixed top-4 right-4 flex gap-3 z-20">
+        <div className="fixed top-4 right-4 flex items-center gap-3 z-20">
+          <button
+            type="button"
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="text-quiet focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          >
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </button>
           <button
             type="button"
             onClick={() => dispatch({ type: 'SET_VIEW', view: 'sharing' })}
