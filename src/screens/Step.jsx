@@ -12,7 +12,12 @@ const SECOND_LINE_DELAY_MS = 7000;
    of it. */
 const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
 
-/* The lit card. One step, two buttons: [Done] [Too big].
+/* The lit card. One step, four buttons: [Done] [Too big] [Too vague] [Don't have it].
+
+   spec.md F11: "One-tap reject: too big / too vague / don't have what I
+   need." All three reject reasons are single always-visible buttons, not
+   hidden behind a menu — a menu would turn one tap into two, which is
+   exactly the kind of extra decision this tool exists to remove.
 
    Waiting states, hard rule 12: "If generation is pending, the previous
    step stays on screen unchanged." That is exactly what happens here for
@@ -32,7 +37,7 @@ const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in wi
    App.jsx (cumulative across the whole assignment, feeds the LLM); this
    component only renders it. It's hidden during the very first load since
    there's nothing to work on yet. */
-export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWorkSoFarChange, example }) {
+export default function Step({ step, pending, onDone, onTooBig, onTooVague, onMissingPrereq, workSoFar, onWorkSoFarChange, example }) {
   const isFirstLoad = pending && !step;
   const [showSecondLine, setShowSecondLine] = useState(false);
   const [speaking, setSpeaking] = useState(false);
@@ -153,6 +158,22 @@ export default function Step({ step, pending, onDone, onTooBig, workSoFar, onWor
             className="tap rounded-lg border border-line px-5 text-[0.9375rem] disabled:opacity-40"
           >
             Too big
+          </button>
+          <button
+            type="button"
+            onClick={() => stopSpeakingThen(onTooVague)}
+            disabled={pending}
+            className="tap rounded-lg border border-line px-5 text-[0.9375rem] disabled:opacity-40"
+          >
+            Too vague
+          </button>
+          <button
+            type="button"
+            onClick={() => stopSpeakingThen(onMissingPrereq)}
+            disabled={pending}
+            className="tap rounded-lg border border-line px-5 text-[0.9375rem] disabled:opacity-40"
+          >
+            Don't have it
           </button>
           {speechSupported && (
             <button

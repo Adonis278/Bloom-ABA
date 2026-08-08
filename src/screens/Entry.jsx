@@ -19,7 +19,7 @@ const SAMPLE_ASSIGNMENT =
    "in the middle of it," and the in-task screen keeps its original,
    unmodified one-focal-element purity. See CLAUDE.md "Landing page &
    account model". */
-export default function Entry({ onStart, onMyWork, onProgress }) {
+export default function Entry({ onStart, onMyWork, onProgress, onDisplay }) {
   const [assignment, setAssignment] = useState(SAMPLE_ASSIGNMENT);
   const canStart = assignment.trim().length > 0;
 
@@ -46,6 +46,15 @@ export default function Entry({ onStart, onMyWork, onProgress }) {
           className="tap fixed left-4 top-4 rounded-lg px-3 text-[0.8125rem] text-muted"
         >
           Progress
+        </button>
+      )}
+      {onDisplay && (
+        <button
+          type="button"
+          onClick={onDisplay}
+          className="tap fixed bottom-4 right-4 rounded-lg px-3 text-[0.8125rem] text-muted"
+        >
+          Display
         </button>
       )}
       <div className="w-full max-w-[620px]">

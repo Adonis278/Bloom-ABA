@@ -11,7 +11,9 @@ import Entry from './screens/Entry.jsx';
 import Step from './screens/Step.jsx';
 import MyWork from './screens/MyWork.jsx';
 import AdultView from './screens/AdultView.jsx';
+import Display from './screens/Display.jsx';
 import { generateStep, generateExample } from './lib/generateStep.js';
+import { loadDisplayPrefs, applyDisplayPrefs } from './lib/accessibility.js';
 
 const MAX_PROMPT_LEVEL = 4;
 const FALLBACK_STEP = 'Open the document you are working on.';
@@ -39,7 +41,14 @@ export default function App() {
   const [activeChild, setActiveChild] = useState(null);
   const [justCreated, setJustCreated] = useState(false);
   const [entered, setEntered] = useState(false);
-  const [view, setView] = useState('task'); // 'task' | 'myWork' | 'adultView'
+  const [view, setView] = useState('task'); // 'task' | 'myWork' | 'adultView' | 'display'
+
+  // Applied once, before sign-in even resolves, so a returning student's
+  // display preferences are in effect from the very first paint rather than
+  // flashing in after the Display screen has been opened once this session.
+  useEffect(() => {
+    applyDisplayPrefs(loadDisplayPrefs());
+  }, []);
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
@@ -132,7 +141,8 @@ export default function App() {
   const requestStep = useCallback(async ({ text, level, done, reason }) => {
     setPending(true);
     setExample(null);
-    const wantsExample = reason === 'silent_stall' || reason === 'too_big';
+    const wantsExample =
+      reason === 'silent_stall' || reason === 'too_big' || reason === 'too_vague' || reason === 'missing_prereq';
     try {
       const { step: next, complete } = await generateStep({
         assignment: text,
@@ -265,6 +275,50 @@ export default function App() {
     requestStep({ text: assignment, level, done: completedSteps, reason: 'too_big' });
   }
 
+  // spec.md F11 — same shape as handleTooBig, only the reject reason and
+  // the reason passed to the model differ. Kept as separate named handlers
+  // rather than one parameterized function so each stays a one-line wire-up
+  // in JSX (onTooVague={handleTooVague}), matching the existing pattern.
+  function handleTooVague() {
+    const level = Math.min(promptLevel + 1, MAX_PROMPT_LEVEL);
+    setPromptLevel(level);
+    setIndependentStreak(0);
+
+    if (authUser && activeChild && step) {
+      detector.noteReject();
+      addStepEntry(authUser.uid, activeChild.id, sessionIdRef.current, {
+        target: step,
+        promptLevel,
+        rejected: 'too_vague',
+        independent: false,
+        outcome: 'rejected',
+        ...detector.getStepMetrics(),
+      });
+    }
+
+    requestStep({ text: assignment, level, done: completedSteps, reason: 'too_vague' });
+  }
+
+  function handleMissingPrereq() {
+    const level = Math.min(promptLevel + 1, MAX_PROMPT_LEVEL);
+    setPromptLevel(level);
+    setIndependentStreak(0);
+
+    if (authUser && activeChild && step) {
+      detector.noteReject();
+      addStepEntry(authUser.uid, activeChild.id, sessionIdRef.current, {
+        target: step,
+        promptLevel,
+        rejected: 'missing_prereq',
+        independent: false,
+        outcome: 'rejected',
+        ...detector.getStepMetrics(),
+      });
+    }
+
+    requestStep({ text: assignment, level, done: completedSteps, reason: 'missing_prereq' });
+  }
+
   function handleSilentStall(score) {
     const level = Math.min(promptLevel + 1, MAX_PROMPT_LEVEL);
     setPromptLevel(level);
@@ -339,12 +393,17 @@ export default function App() {
     );
   }
 
+  if (view === 'display') {
+    return <Display onBack={() => setView('task')} />;
+  }
+
   if (assignment === null) {
     return (
       <Entry
         onStart={handleStart}
         onMyWork={() => setView('myWork')}
         onProgress={() => setView('adultView')}
+        onDisplay={() => setView('display')}
       />
     );
   }
@@ -392,6 +451,8 @@ export default function App() {
       pending={pending}
       onDone={handleDone}
       onTooBig={handleTooBig}
+      onTooVague={handleTooVague}
+      onMissingPrereq={handleMissingPrereq}
       workSoFar={workSoFar}
       onWorkSoFarChange={setWorkSoFar}
       example={example}

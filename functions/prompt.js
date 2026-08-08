@@ -26,6 +26,10 @@ const REASON_SPEC = {
     'The student said the last step was too big. Keep the same goal, but make it smaller — less of it, not a different task.',
   silent_stall:
     'The student stalled silently. Give a SMALLER PIECE of the same next thing — one sentence instead of a paragraph, or its opening words. Lowering the demand means a smaller forward move, never a backward or passive one.',
+  too_vague:
+    'The student said the last step was too vague. Be far more literal and concrete this time — name the exact document, sentence, or words involved, not just an action category. Do not just repeat the same step in different phrasing.',
+  missing_prereq:
+    'The student said they do not have what the last step needs. Give a step that does not depend on that missing thing — either how to find or get it, or a different concrete path toward the same goal that skips it entirely.',
 };
 
 /* The draft is the source of truth for where the student is — not the

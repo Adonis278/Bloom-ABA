@@ -13,11 +13,21 @@
 --------------------------------------------------------------------------- */
 
 :root        { --paper:221 225 219; --card:241 243 239; --ink:34 39 34;
-               --muted:83 90 83;   --line:195 202 191; --warm:122 106 79; }
+               --muted:83 90 83;   --line:195 202 191; --warm:122 106 79;
+               --letter-spacing:0em; --font-weight-body:400; }
 
 [data-tint="sand"]  { --paper:227 223 214; --card:245 242 236; }
 [data-tint="mist"]  { --paper:217 223 226; --card:238 242 244; }
 [data-tint="rose"]  { --paper:228 220 220; --card:245 240 240; }
+
+/* spec.md F26 — student-controlled spacing and weight, same "swap
+   variables, components never change" pattern as the tints above. Applied
+   globally via body below; explicit per-element weight (font-bold on the
+   step text, buttons) still wins on specificity, which is correct — F26 is
+   about baseline readability, not overriding the step's intentional
+   emphasis. */
+[data-spacing="wide"] { --letter-spacing:0.04em; }
+[data-weight="bold"]  { --font-weight-body:600; }
 
 /* Dark is #2A2E2B, never #000 — pure black with light text produces
    halation on OLED. */
@@ -42,6 +52,9 @@
     @apply bg-paper text-ink font-sans antialiased;
     margin: 0;
     min-height: 100dvh;
+    letter-spacing: var(--letter-spacing);
+    word-spacing: var(--letter-spacing);
+    font-weight: var(--font-weight-body);
   }
 
   /* Keyboard complete: every action reachable by Tab, visible 2px focus ring.
