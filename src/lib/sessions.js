@@ -27,6 +27,19 @@ export function startSession(uid, childId, assignmentText) {
   return ref.id;
 }
 
+/* Closes the session out when the assignment actually reaches the length it
+   asked for. Until this existed, endedAt/outcome stayed null forever and the
+   Progress view could only show a proxy for completion — see CLAUDE.md
+   "Ending an assignment". */
+export function finishSession(uid, childId, sessionId) {
+  if (!sessionId) return;
+  setDoc(
+    doc(db, 'profiles', uid, 'children', childId, 'sessions', sessionId),
+    { endedAt: serverTimestamp(), outcome: 'completed' },
+    { merge: true },
+  ).catch(() => {});
+}
+
 export function addStepEntry(uid, childId, sessionId, entry) {
   if (!sessionId) return;
   addDoc(collection(db, 'profiles', uid, 'children', childId, 'sessions', sessionId, 'steps'), {

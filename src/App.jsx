@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { auth, onAuthStateChanged, signInWithGoogle } from './lib/firebase.js';
 import { ensureAdultProfile, listChildren, createChild, touchChild, updateExpectedSeconds } from './lib/profile.js';
 import { addHistoryEntry } from './lib/history.js';
-import { startSession, addStepEntry } from './lib/sessions.js';
+import { startSession, addStepEntry, finishSession } from './lib/sessions.js';
 import { medianOf, EXPECTED_SECONDS_DEFAULT } from './lib/scoring.js';
 import { useStuckDetector } from './hooks/useStuckDetector.js';
 import LandingPage from './screens/LandingPage.jsx';
@@ -126,6 +126,7 @@ export default function App() {
      deliberately one thing at a time. Fetched after the step is already
      rendered, so it never delays the step itself. */
   const [example, setExample] = useState(null);
+  const [finished, setFinished] = useState(false);
   const stepRef = useRef(null);
 
   const requestStep = useCallback(async ({ text, level, done, reason }) => {
@@ -133,13 +134,24 @@ export default function App() {
     setExample(null);
     const wantsExample = reason === 'silent_stall' || reason === 'too_big';
     try {
-      const next = await generateStep({
+      const { step: next, complete } = await generateStep({
         assignment: text,
         workSoFar: workSoFarRef.current,
         completedSteps: done,
         promptLevel: level,
         reason,
       });
+
+      /* The assignment reached the length it asked for. Stop the loop rather
+         than generating another "next sentence" forever. */
+      if (complete) {
+        setFinished(true);
+        if (authUser && activeChild) {
+          finishSession(authUser.uid, activeChild.id, sessionIdRef.current);
+        }
+        return;
+      }
+
       setStep(next);
       stepRef.current = next;
       if (wantsExample) {
@@ -178,6 +190,9 @@ export default function App() {
     setWorkSoFar('');
     workSoFarRef.current = '';
     setIndependentStreak(0);
+    setFinished(false);
+    setCompletedSteps([]);
+    setPromptLevel(0);
     if (authUser && activeChild) {
       sessionIdRef.current = startSession(authUser.uid, activeChild.id, text);
     }
@@ -331,6 +346,43 @@ export default function App() {
         onMyWork={() => setView('myWork')}
         onProgress={() => setView('adultView')}
       />
+    );
+  }
+
+  /* The assignment reached the length it asked for. Flat and final — no
+     praise, no exclamation mark, no score (hard rules 2 and 6). It states
+     what happened and offers the two things a student might actually want
+     next. */
+  if (finished) {
+    return (
+      <main className="grid min-h-dvh place-items-center px-6 py-10">
+        <div className="w-full max-w-[620px] text-center">
+          <p className="text-step font-bold" aria-live="polite">
+            That's the whole assignment.
+          </p>
+          <div className="mt-10 flex flex-wrap justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => setView('myWork')}
+              className="tap rounded-lg border border-line px-5 text-[0.9375rem] font-bold"
+            >
+              See my work
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAssignment(null);
+                setFinished(false);
+                setStep(null);
+                stepRef.current = null;
+              }}
+              className="tap rounded-lg border border-line px-5 text-[0.9375rem]"
+            >
+              Start something else
+            </button>
+          </div>
+        </div>
+      </main>
     );
   }
 

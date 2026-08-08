@@ -97,7 +97,7 @@ export default function AdultView({ uid, childId, childName, onBack }) {
 
             <RateRow
               label="Assignment completion"
-              note="Proxy: sessions whose most recent step ended cleanly, not mid-reject or mid-stall. Not a true finish signal — this app has no explicit finish action yet."
+              note="Sessions that reached the length the assignment asked for. Sessions started before the finish line existed fall back to whether their last step ended cleanly."
               rate={data.completion.rate}
               detail={`${data.completion.sessions.filter((s) => s.completed).length} of ${data.completion.sessions.length} sessions`}
             />

@@ -1,4 +1,5 @@
 import { mapDraft, describeDraft } from './draftMap.js';
+import { targetWordsFor, assignmentPhase } from './target.js';
 
 /* Prompt construction — spec.md Part 3.
 
@@ -52,7 +53,6 @@ const MID_SENTENCE_OVERRIDE = [
 const DRAFT_READING = [
   'Continue the draft from STOPPED HERE — that is exactly where they ran out.',
   'The draft, not the step list, says where they are. Never repeat or send them back to a part they already wrote.',
-  'If STRUCTURE shows several full paragraphs and the ideas are covered, the missing part is THE ENDING: ask for the closing sentence, not more middle.',
   'Never tell them to read, re-read, review, or think about what they wrote, and never send them to a dictionary, website, separate sheet, or other material. Everything happens on the page they are already writing on.',
   'Name their real subject — the thing their last line is actually about.',
 ];
@@ -72,6 +72,24 @@ function draftTail(text) {
 const NO_DRAFT_NOTE =
   'The draft is empty. Give a step that gets the first words onto the page — the smallest real beginning, not planning or thinking.';
 
+/* Replaces an earlier instruction that asked the model to judge for itself
+   whether the draft was "long enough" — which it did unreliably, usually
+   defaulting to "write the next sentence" forever. The phase is computed in
+   target.js now, so the model is told which one it is instead of guessing.
+   Shorter prompt AND a more reliable answer. */
+const PHASE_SPEC = {
+  building: null, // no extra instruction — the default guidance already covers it
+  ending:
+    'THE DRAFT IS NEARLY LONG ENOUGH. The missing piece is THE ENDING. The step is to write the closing sentence that wraps the whole piece up — a last thought about what it meant or how it turned out. Do not ask for more middle.',
+  /* The draft is long enough but is not about the assignment. Steering back
+     is delicate: the student has written a lot, and the step must not read as
+     "that was wrong" (hard rule 1 — a step that didn't work is quietly
+     replaced, never marked). So it names the assignment's actual subject and
+     asks for one sentence on it, without judging what is already there. */
+  redirect:
+    'The draft has plenty of words but is not about the assignment. Do NOT mention that, do not say it is wrong, and do not ask them to delete or fix anything. Simply name what the assignment actually asks about and ask for ONE sentence on that subject.',
+};
+
 const RETRY_HINTS = {
   too_short: 'Your last answer was too vague. Name the exact thing to open, type, write, or find — not just the verb.',
   too_long: 'Your last answer was too long. Say it in 12 words or fewer this time.',
@@ -84,17 +102,47 @@ export function buildRetryHint(problems) {
   return lines.length ? lines.join(' ') : null;
 }
 
-export function buildPrompt({ assignment, workSoFar, completedSteps, promptLevel, reason, retryHint }) {
+export function buildPrompt({ assignment, workSoFar, completedSteps, promptLevel, reason, retryHint, phase }) {
   const level = LEVEL_SPEC[promptLevel] ?? LEVEL_SPEC[0];
-  const why = REASON_SPEC[reason] ?? REASON_SPEC.next;
+  // Every REASON tells the model to continue the draft, which is the opposite
+  // of what a redirect needs — so the phase overrides it rather than sitting
+  // next to it contradicting itself.
+  const why =
+    phase === 'redirect'
+      ? 'The student is writing about the wrong subject. Start them on the right one.'
+      : (REASON_SPEC[reason] ?? REASON_SPEC.next);
   const hasDraft = Boolean(workSoFar?.trim());
   const map = hasDraft ? mapDraft(workSoFar) : null;
 
-  // The draft-reading instruction is skipped on the very first step: there is
-  // no draft yet, and the first step is preparatory by design.
-  const draftGuidance = hasDraft
-    ? [...(map?.endsMidSentence ? MID_SENTENCE_OVERRIDE : []), ...DRAFT_READING]
-    : [NO_DRAFT_NOTE];
+  /* core.js passes the phase in, because it has to compute one anyway to
+     decide whether the loop ends and whether the draft is on topic — and
+     'redirect' is only knowable there. Computing it here as a fallback keeps
+     buildPrompt usable on its own. */
+  const resolvedPhase =
+    phase ??
+    (map
+      ? assignmentPhase({
+          wordCount: map.wordCount,
+          endsMidSentence: map.endsMidSentence,
+          target: targetWordsFor(assignment),
+        })
+      : 'building');
+  const phaseLine = PHASE_SPEC[resolvedPhase];
+
+  /* 'redirect' REPLACES the draft-reading guidance rather than adding to it.
+     That guidance says "continue from where the draft stops" — which is
+     exactly wrong when the draft is about the wrong subject, and produced
+     steps like "write the last sentence of the paragraph about summer break"
+     for a draft about mitochondria. There is nothing here to continue. */
+  const draftGuidance = !hasDraft
+    ? [NO_DRAFT_NOTE]
+    : resolvedPhase === 'redirect'
+      ? [phaseLine]
+      : [
+          ...(map?.endsMidSentence ? MID_SENTENCE_OVERRIDE : []),
+          ...(phaseLine ? [phaseLine] : []),
+          ...DRAFT_READING,
+        ];
   const readDraft = reason === 'first' ? [] : [...draftGuidance, ''];
 
   const system = [
@@ -123,16 +171,32 @@ export function buildPrompt({ assignment, workSoFar, completedSteps, promptLevel
 
   // Draft first, then the step list — the draft is the primary evidence of
   // where the student is, and the step list is only supporting context.
-  const user = [
-    `ASSIGNMENT: ${assignment}`,
-    hasDraft
-      ? `WHAT THE STUDENT HAS WRITTEN SO FAR (verbatim):\n${workSoFar}`
-      : 'WHAT THE STUDENT HAS WRITTEN SO FAR: (nothing on the page yet)',
-    hasDraft ? `STRUCTURE: ${describeDraft(mapDraft(workSoFar))}` : null,
-    hasDraft ? `STOPPED HERE — the writing runs out right after this:\n${draftTail(workSoFar)}` : null,
-    `STEPS ALREADY GIVEN:\n${done}`,
-  ]
-    .filter((line) => line !== null)
+  /* On redirect the draft is withheld entirely. Measured: with the off-topic
+     text still in the message the model anchors on it no matter what the
+     instructions say — for a draft about mitochondria it produced "write a
+     sentence that summarizes what you learned about cells", pushing the
+     student further off the assignment. Removing just the STOPPED HERE tail
+     was not enough; the verbatim block is the anchor. With nothing to anchor
+     to, the only subject left in the prompt is the assignment itself. */
+  const user =
+    resolvedPhase === 'redirect'
+      ? [
+          `ASSIGNMENT: ${assignment}`,
+          'The student has written a lot, but none of it is about this assignment. Ignore what is on their page — do not refer to it, continue it, or ask them to change it.',
+          'Give one step that starts them on the assignment above: write ONE sentence about its actual subject.',
+        ].join('\n\n')
+      : [
+          `ASSIGNMENT: ${assignment}`,
+          hasDraft
+            ? `WHAT THE STUDENT HAS WRITTEN SO FAR (verbatim):\n${workSoFar}`
+            : 'WHAT THE STUDENT HAS WRITTEN SO FAR: (nothing on the page yet)',
+          hasDraft ? `STRUCTURE: ${describeDraft(mapDraft(workSoFar))}` : null,
+          hasDraft
+            ? `STOPPED HERE — the writing runs out right after this:\n${draftTail(workSoFar)}`
+            : null,
+          `STEPS ALREADY GIVEN:\n${done}`,
+        ]
+          .filter((line) => line !== null)
     .join('\n\n');
 
   return { system, user };

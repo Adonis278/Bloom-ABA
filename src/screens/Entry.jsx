@@ -1,10 +1,16 @@
 import { useState } from 'react';
 
-// A real, ready-to-go assignment instead of a blank box — see CLAUDE.md
-// "Premade assignment" for why. Still just the textarea's initial value;
-// fully editable, not a fixture.
+/* A real, ready-to-go assignment instead of a blank box — see CLAUDE.md
+   "Premade assignment" for why. Still just the textarea's initial value;
+   fully editable, not a fixture.
+
+   Deliberately SHORT (60 words, not a page). The length written here is what
+   target.js reads to decide when the assignment is finished, so a small
+   target means a tester can reach the ending in a couple of minutes instead
+   of writing a full page first. Change the number here and the finish line
+   moves with it. */
 const SAMPLE_ASSIGNMENT =
-  'Write a one-page reflection about something you did over summer break for English class. Due Friday.';
+  'Write a short paragraph — about 60 words — about something you did over summer break. For English class, due Friday.';
 
 /* One textarea, one Start button. Nothing else competes for attention here
    (hard rule 3) — the one exception is a small "My work" link, added when

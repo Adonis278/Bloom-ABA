@@ -19,12 +19,15 @@ import { db } from './firebase.js';
 
 const MAX_SESSIONS = 50;
 
-// "Assignment completion" has no real signal in this app yet — the loop
-// just keeps generating "next" steps, there's no finish action. This is an
-// honest, labeled proxy (did the session's last logged step end cleanly),
-// not true completion tracking. See CLAUDE.md "Adult analytics dashboard".
-function sessionCompletedProxy(steps) {
-  const last = steps[steps.length - 1];
+/* Sessions started after the finish line existed carry a real
+   outcome: 'completed' written by finishSession(). Older sessions predate it
+   and have outcome null forever, so they fall back to the original proxy —
+   did the last logged step end cleanly. Real signal where we have one,
+   labelled honestly where we don't. */
+function sessionCompleted(session) {
+  if (session.outcome === 'completed') return true;
+  if (session.outcome != null) return false;
+  const last = session.steps[session.steps.length - 1];
   return last?.outcome === 'completed';
 }
 
@@ -47,6 +50,7 @@ export async function computeChildAnalytics(uid, childId) {
       );
       return {
         startedAt: sDoc.data().startedAt ?? null,
+        outcome: sDoc.data().outcome ?? null,
         steps: stepsSnap.docs.map((d) => d.data()),
       };
     }),
@@ -86,7 +90,7 @@ export async function computeChildAnalytics(uid, childId) {
 
     completionSessions.push({
       t: session.startedAt?.toMillis?.() ?? null,
-      completed: sessionCompletedProxy(steps),
+      completed: sessionCompleted(session),
     });
   }
 
