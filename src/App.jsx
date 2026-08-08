@@ -8,6 +8,7 @@ import SharingPanel from './components/SharingPanel.jsx'
 import { getNextStep } from './lib/stepEngine.js'
 import { getSettings, setSettings, getSharing, setSharing } from './lib/storage.js'
 import { celebrate } from './lib/celebrate.js'
+import { getInitialTheme, applyTheme } from './lib/theme.js'
 
 const BADGES = [
   { minDone: 1, emoji: '🌱', label: 'First Step' },
@@ -64,6 +65,7 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [settings, setSettingsState] = useState(getSettings)
   const [sharing, setSharingState] = useState(getSharing)
+  const [theme, setTheme] = useState(getInitialTheme)
 
   useEffect(() => {
     setSettings(settings)
@@ -72,6 +74,10 @@ export default function App() {
   useEffect(() => {
     setSharing(sharing)
   }, [sharing])
+
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
 
   async function handleSubmitAssignment(text) {
     dispatch({ type: 'SUBMIT_ASSIGNMENT', assignmentInput: text })
@@ -130,7 +136,7 @@ export default function App() {
           </span>
           <span className="font-display font-bold text-ink text-sm">{xp} XP</span>
           {doneStreak > 0 && (
-            <span className="font-display font-bold text-orange text-sm flex items-center gap-1">
+            <span className="font-display font-bold text-orangeText text-sm flex items-center gap-1">
               🔥 {doneStreak}
             </span>
           )}
@@ -139,6 +145,14 @@ export default function App() {
 
       {showCorner && (
         <div className="fixed top-16 right-4 flex gap-2 z-20">
+          <button
+            type="button"
+            onClick={() => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="bg-cloud shadow-md rounded-full w-9 h-9 flex items-center justify-center text-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-purple motion-safe:transition-transform motion-safe:hover:scale-105"
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
           <button
             type="button"
             onClick={() => dispatch({ type: 'SET_VIEW', view: 'sharing' })}

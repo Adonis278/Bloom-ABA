@@ -86,13 +86,13 @@ export default function EntryForm({ onSubmit }) {
         </button>
       </form>
 
-      <div className="relative w-full max-w-md mt-8 text-sm text-ink/60 font-body text-center">
+      <div className="relative w-full max-w-md mt-8 text-sm text-ink/70 font-body text-center">
         <p>
           We only use what you type to make your steps. Nothing is shared without you saying so.{' '}
           <button
             type="button"
             onClick={() => setShowPrivacyDetail((prev) => !prev)}
-            className="underline font-semibold text-purple focus:outline-none focus-visible:ring-2 focus-visible:ring-purple rounded"
+            className="underline font-semibold text-purpleText focus:outline-none focus-visible:ring-2 focus-visible:ring-purple rounded"
           >
             {showPrivacyDetail ? 'less' : 'more'}
           </button>

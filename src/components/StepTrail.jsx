@@ -4,7 +4,7 @@ export default function ProgressBar({ percent }) {
       <div className="max-w-md mx-auto">
         <div className="flex items-center justify-between mb-1">
           <span className="font-display font-bold text-xs text-ink">Progress</span>
-          <span className="font-display font-bold text-xs text-purple">{percent}%</span>
+          <span className="font-display font-bold text-xs text-purpleText">{percent}%</span>
         </div>
         <div className="h-2.5 w-full bg-ink/10 rounded-full overflow-hidden">
           <div

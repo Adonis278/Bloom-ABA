@@ -67,7 +67,7 @@ export default function StepView({
         <button
           type="button"
           onClick={onRejectOpen}
-          className="text-ink/60 text-sm font-body font-semibold underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple rounded"
+          className="text-ink/70 text-sm font-body font-semibold underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple rounded"
         >
           this isn&apos;t right 🤔
         </button>
@@ -76,7 +76,7 @@ export default function StepView({
           <button
             type="button"
             onClick={onBreakOpen}
-            className="text-ink/60 text-sm font-body font-semibold underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple rounded"
+            className="text-ink/70 text-sm font-body font-semibold underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple rounded"
           >
             need a breather? 😌
           </button>

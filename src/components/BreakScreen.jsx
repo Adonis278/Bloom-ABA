@@ -7,7 +7,7 @@ export default function BreakScreen({ onReturn }) {
       <p className="font-display font-extrabold text-ink text-3xl mt-4 max-w-md">
         Break time! You&apos;ve earned it.
       </p>
-      <p className="mt-3 text-ink/60 font-body text-base max-w-sm">
+      <p className="mt-3 text-ink/70 font-body text-base max-w-sm">
         Stretch, breathe, grab a snack. Come back whenever you&apos;re ready — your step will be
         right here. 💛
       </p>

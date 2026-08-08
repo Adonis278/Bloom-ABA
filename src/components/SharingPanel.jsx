@@ -30,7 +30,7 @@ export default function SharingPanel({ sharing, onChange, onClose }) {
         </button>
 
         <h1 className="text-ink font-display font-extrabold text-3xl mb-2">Sharing 🔗</h1>
-        <p className="text-ink/60 text-sm font-body mb-8">
+        <p className="text-ink/70 text-sm font-body mb-8">
           You choose what an adult can see. You can change this any time.
         </p>
 

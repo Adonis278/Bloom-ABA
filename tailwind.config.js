@@ -1,11 +1,14 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       colors: {
-        ink: '#1E1B2E',
-        cloud: '#FFFFFF',
+        ink: 'rgb(var(--color-ink) / <alpha-value>)',
+        cloud: 'rgb(var(--color-cloud) / <alpha-value>)',
+        purpleText: 'rgb(var(--color-purple-text) / <alpha-value>)',
+        orangeText: 'rgb(var(--color-orange-text) / <alpha-value>)',
         purple: '#7C3AED',
         pink: '#EC4899',
         orange: '#FB923C',

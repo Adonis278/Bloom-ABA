@@ -52,7 +52,7 @@ export default function Settings({ settings, onChange, onClose }) {
                 className={`px-4 py-2 rounded-full font-display font-bold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple motion-safe:transition-transform motion-safe:hover:scale-105 ${
                   settings.textSize === size
                     ? 'bg-gradient-to-r from-purple to-pink text-white shadow-md'
-                    : 'bg-ink/5 text-ink/60'
+                    : 'bg-ink/5 text-ink/70'
                 }`}
               >
                 {size}
