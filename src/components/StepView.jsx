@@ -1,16 +1,17 @@
 import { useEffect } from 'react'
-import StepTrail from './StepTrail.jsx'
+import ProgressBar from './StepTrail.jsx'
 
 const TEXT_SIZE_CLASS = {
-  standard: 'text-[clamp(1.75rem,4vw+1rem,3rem)]',
-  large: 'text-[clamp(2rem,4.5vw+1.25rem,3.5rem)]',
-  largest: 'text-[clamp(2.25rem,5vw+1.5rem,4rem)]',
+  standard: 'text-3xl',
+  large: 'text-4xl',
+  largest: 'text-5xl',
 }
 
 export default function StepView({
   stepId,
   stepText,
-  pastCount,
+  percent,
+  badges,
   suggestBreak,
   textSize,
   readAloud,
@@ -30,43 +31,57 @@ export default function StepView({
   const sizeClass = TEXT_SIZE_CLASS[textSize] ?? TEXT_SIZE_CLASS.standard
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 pb-20">
-      <p
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 pb-16 pt-24">
+      <ProgressBar percent={percent} />
+
+      {badges.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-2 mb-6" aria-label="Badges earned">
+          {badges.map((badge) => (
+            <span
+              key={badge.label}
+              className="flex items-center gap-1 bg-cloud shadow-md rounded-full px-3 py-1.5 text-xs font-display font-bold text-ink motion-safe:animate-popIn"
+            >
+              <span aria-hidden="true">{badge.emoji}</span>
+              {badge.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div
         key={stepId}
-        className={`step-fade-enter font-display text-ink text-center max-w-lg leading-[1.3] tracking-tight ${sizeClass}`}
+        className="motion-safe:animate-popIn bg-cloud rounded-[2.5rem] border-4 border-sky/30 shadow-2xl px-8 py-10 max-w-lg w-full text-center"
       >
-        {stepText}
-      </p>
+        <p className={`font-display font-bold text-ink leading-snug ${sizeClass}`}>{stepText}</p>
+      </div>
 
       <button
         type="button"
         onClick={onDone}
-        className="mt-10 min-h-[52px] bg-accent text-white font-chrome text-base px-8 rounded-[22px_28px_20px_26px] motion-safe:transition-transform motion-safe:duration-150 motion-safe:ease-out motion-safe:active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent"
+        className="mt-8 min-h-[56px] bg-gradient-to-r from-lime via-sky to-purple text-white font-display font-bold text-lg px-10 rounded-full shadow-lg motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:scale-105 motion-safe:active:scale-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-purple"
       >
-        Done
+        Done! ✅
       </button>
 
-      <div className="mt-4 flex flex-col items-center gap-1">
+      <div className="mt-5 flex flex-col items-center gap-2">
         <button
           type="button"
           onClick={onRejectOpen}
-          className="text-quiet text-sm font-chrome underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          className="text-ink/60 text-sm font-body font-semibold underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple rounded"
         >
-          this isn&apos;t right
+          this isn&apos;t right 🤔
         </button>
 
         {suggestBreak && (
           <button
             type="button"
             onClick={onBreakOpen}
-            className="text-quiet text-sm font-chrome underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+            className="text-ink/60 text-sm font-body font-semibold underline focus:outline-none focus-visible:ring-2 focus-visible:ring-purple rounded"
           >
-            want a short break?
+            need a breather? 😌
           </button>
         )}
       </div>
-
-      <StepTrail pastCount={pastCount} />
     </div>
   )
 }

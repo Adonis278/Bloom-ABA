@@ -1,18 +1,22 @@
 export default function BreakScreen({ onReturn }) {
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6">
-      <p className="font-display text-ink text-2xl text-center max-w-md leading-[1.3]">
-        You can take a short break whenever you want.
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+      <span className="text-7xl motion-safe:animate-wiggle inline-block" aria-hidden="true">
+        🧘
+      </span>
+      <p className="font-display font-extrabold text-ink text-3xl mt-4 max-w-md">
+        Break time! You&apos;ve earned it.
       </p>
-      <p className="mt-3 text-quiet font-body text-sm text-center max-w-sm">
-        Come back any time. Your step will be here.
+      <p className="mt-3 text-ink/60 font-body text-base max-w-sm">
+        Stretch, breathe, grab a snack. Come back whenever you&apos;re ready — your step will be
+        right here. 💛
       </p>
       <button
         type="button"
         onClick={onReturn}
-        className="mt-8 min-h-[52px] bg-accent text-white font-chrome text-base px-8 rounded-[22px_28px_20px_26px] motion-safe:transition-transform motion-safe:duration-150 motion-safe:ease-out motion-safe:active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent"
+        className="mt-8 min-h-[56px] bg-gradient-to-r from-purple via-pink to-orange text-white font-display font-bold text-lg px-10 rounded-full shadow-lg motion-safe:transition-transform motion-safe:duration-200 motion-safe:hover:scale-105 motion-safe:active:scale-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-offset-2 focus-visible:ring-purple"
       >
-        back to my step
+        Back to my step 🚀
       </button>
     </div>
   )

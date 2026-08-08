@@ -1,49 +1,47 @@
+import Toggle from './Toggle.jsx'
+
 export default function Settings({ settings, onChange, onClose }) {
   function update(patch) {
     onChange({ ...settings, ...patch })
   }
 
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center px-6 py-14">
+    <div className="min-h-screen flex flex-col items-center px-6 py-16">
       <div className="w-full max-w-md">
         <button
           type="button"
           onClick={onClose}
-          className="text-quiet text-sm font-chrome underline mb-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+          className="bg-cloud shadow-md rounded-full px-4 py-2 text-ink font-display font-semibold text-sm mb-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple"
         >
-          back
+          ← back
         </button>
 
-        <h1 className="text-ink font-display text-2xl mb-8">Settings</h1>
+        <h1 className="text-ink font-display font-extrabold text-3xl mb-8">Settings ⚙️</h1>
 
-        <fieldset className="mb-6 bg-surface border border-hairline rounded-2xl px-5 py-4">
-          <legend className="text-ink font-body text-base mb-3 px-1">How steps are made</legend>
-          <label className="flex items-center gap-2 text-ink font-body text-sm mb-3">
-            <input
-              type="checkbox"
+        <fieldset className="mb-5 bg-cloud shadow-xl border-2 border-sky/20 rounded-3xl px-5 py-5">
+          <legend className="text-ink font-display font-bold text-base mb-3 px-1">
+            How steps are made
+          </legend>
+          <div className="flex flex-col gap-4">
+            <Toggle
+              label="Make steps smaller"
               checked={settings.aiRules.smallerSteps}
               onChange={(event) =>
                 update({ aiRules: { ...settings.aiRules, smallerSteps: event.target.checked } })
               }
-              className="focus-visible:ring-2 focus-visible:ring-accent"
             />
-            Make steps smaller
-          </label>
-          <label className="flex items-center gap-2 text-ink font-body text-sm">
-            <input
-              type="checkbox"
+            <Toggle
+              label="Read steps out loud"
               checked={settings.aiRules.readAloud}
               onChange={(event) =>
                 update({ aiRules: { ...settings.aiRules, readAloud: event.target.checked } })
               }
-              className="focus-visible:ring-2 focus-visible:ring-accent"
             />
-            Read steps out loud
-          </label>
+          </div>
         </fieldset>
 
-        <fieldset className="mb-6 bg-surface border border-hairline rounded-2xl px-5 py-4">
-          <legend className="text-ink font-body text-base mb-3 px-1">Text size</legend>
+        <fieldset className="mb-5 bg-cloud shadow-xl border-2 border-yellow/30 rounded-3xl px-5 py-5">
+          <legend className="text-ink font-display font-bold text-base mb-3 px-1">Text size</legend>
           <div className="flex gap-2">
             {['standard', 'large', 'largest'].map((size) => (
               <button
@@ -51,10 +49,10 @@ export default function Settings({ settings, onChange, onClose }) {
                 type="button"
                 onClick={() => update({ textSize: size })}
                 aria-pressed={settings.textSize === size}
-                className={`px-3 py-2 rounded-full border font-body text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                className={`px-4 py-2 rounded-full font-display font-bold text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple motion-safe:transition-transform motion-safe:hover:scale-105 ${
                   settings.textSize === size
-                    ? 'border-ink text-ink bg-bg'
-                    : 'border-hairline text-quiet'
+                    ? 'bg-gradient-to-r from-purple to-pink text-white shadow-md'
+                    : 'bg-ink/5 text-ink/60'
                 }`}
               >
                 {size}
@@ -63,19 +61,17 @@ export default function Settings({ settings, onChange, onClose }) {
           </div>
         </fieldset>
 
-        <fieldset className="bg-surface border border-hairline rounded-2xl px-5 py-4">
-          <legend className="text-ink font-body text-base mb-3 px-1">A little reminder for yourself</legend>
-          <label className="flex items-center gap-2 text-ink font-body text-sm mb-3">
-            <input
-              type="checkbox"
-              checked={settings.reward.enabled}
-              onChange={(event) =>
-                update({ reward: { ...settings.reward, enabled: event.target.checked } })
-              }
-              className="focus-visible:ring-2 focus-visible:ring-accent"
-            />
-            Show a message after a few steps
-          </label>
+        <fieldset className="bg-cloud shadow-xl border-2 border-lime/40 rounded-3xl px-5 py-5">
+          <legend className="text-ink font-display font-bold text-base mb-3 px-1">
+            A little reminder for yourself 🎉
+          </legend>
+          <Toggle
+            label="Show a message after a few steps"
+            checked={settings.reward.enabled}
+            onChange={(event) =>
+              update({ reward: { ...settings.reward, enabled: event.target.checked } })
+            }
+          />
           {settings.reward.enabled && (
             <input
               type="text"
@@ -83,8 +79,8 @@ export default function Settings({ settings, onChange, onClose }) {
               onChange={(event) =>
                 update({ reward: { ...settings.reward, message: event.target.value } })
               }
-              placeholder="e.g. You're doing this."
-              className="w-full bg-bg border border-hairline rounded-xl px-3 py-2 text-ink font-body text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              placeholder="e.g. You're doing this! 🌟"
+              className="mt-3 w-full bg-ink/5 border-2 border-ink/10 rounded-xl px-3 py-2 text-ink font-body text-sm outline-none focus-visible:ring-2 focus-visible:ring-purple"
             />
           )}
         </fieldset>

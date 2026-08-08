@@ -7,6 +7,13 @@ import Settings from './components/Settings.jsx'
 import SharingPanel from './components/SharingPanel.jsx'
 import { getNextStep } from './lib/stepEngine.js'
 import { getSettings, setSettings, getSharing, setSharing } from './lib/storage.js'
+import { celebrate } from './lib/celebrate.js'
+
+const BADGES = [
+  { minDone: 1, emoji: '🌱', label: 'First Step' },
+  { minDone: 3, emoji: '🔥', label: 'On a Roll' },
+  { minDone: 6, emoji: '🏆', label: 'Task Master' },
+]
 
 const initialState = {
   view: 'entry',
@@ -75,6 +82,7 @@ export default function App() {
   async function handleDone() {
     const newHistory = [...state.history, { ...state.currentStep, status: 'done' }]
     dispatch({ type: 'MARK_DONE' })
+    celebrate()
     const step = await getNextStep({
       assignmentInput: state.assignmentInput,
       history: newHistory,
@@ -98,25 +106,52 @@ export default function App() {
   }
 
   const pastCount = state.history.filter((entry) => entry.status === 'done').length
+  const doneStreak = (() => {
+    let n = 0
+    for (let i = state.history.length - 1; i >= 0; i--) {
+      if (state.history[i].status === 'done') n++
+      else break
+    }
+    return n
+  })()
+  const xp = pastCount * 10
+  const badges = BADGES.filter((badge) => pastCount >= badge.minDone)
+  const isFinished = state.currentStep?.stepText === 'You finished this assignment.'
+  const percent = isFinished ? 100 : Math.min(95, pastCount * 18)
   const showCorner = state.view === 'entry' || state.view === 'step'
+  const showHud = state.view === 'step'
 
   return (
-    <div className="font-chrome">
+    <div className="font-body min-h-screen">
+      {showHud && (
+        <div className="fixed top-16 left-4 z-20 flex items-center gap-2 bg-cloud rounded-full pl-2 pr-4 py-2 shadow-lg border-2 border-yellow">
+          <span className="text-2xl" aria-hidden="true">
+            ⚡
+          </span>
+          <span className="font-display font-bold text-ink text-sm">{xp} XP</span>
+          {doneStreak > 0 && (
+            <span className="font-display font-bold text-orange text-sm flex items-center gap-1">
+              🔥 {doneStreak}
+            </span>
+          )}
+        </div>
+      )}
+
       {showCorner && (
-        <div className="fixed top-4 right-4 flex gap-3 z-20">
+        <div className="fixed top-16 right-4 flex gap-2 z-20">
           <button
             type="button"
             onClick={() => dispatch({ type: 'SET_VIEW', view: 'sharing' })}
-            className="text-quiet text-xs underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+            className="bg-cloud shadow-md rounded-full px-4 py-2 text-ink font-display font-semibold text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-purple motion-safe:transition-transform motion-safe:hover:scale-105"
           >
-            sharing
+            🔗 sharing
           </button>
           <button
             type="button"
             onClick={() => dispatch({ type: 'SET_VIEW', view: 'settings' })}
-            className="text-quiet text-xs underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded"
+            className="bg-cloud shadow-md rounded-full px-4 py-2 text-ink font-display font-semibold text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-purple motion-safe:transition-transform motion-safe:hover:scale-105"
           >
-            settings
+            ⚙️ settings
           </button>
         </div>
       )}
@@ -128,7 +163,8 @@ export default function App() {
           <StepView
             stepId={state.currentStep.stepId}
             stepText={state.currentStep.stepText}
-            pastCount={pastCount}
+            percent={percent}
+            badges={badges}
             suggestBreak={state.currentStep.suggestBreak}
             textSize={settings.textSize}
             readAloud={settings.aiRules.readAloud}
