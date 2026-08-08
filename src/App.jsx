@@ -75,6 +75,18 @@ export default function App() {
           setActiveChild(list[0]);
           touchChild(authUser.uid, list[0].id).catch(() => {});
         }
+      })
+      .catch(() => {
+        /* Without this the whole app stops at a blank screen. `children`
+           stays null forever, and ChildPicker renders nothing while null —
+           no error, no retry, no way forward. A brand-new user is the most
+           exposed, because they are the one doing a first-ever write.
+
+           Hard rule 1 says no error state; it does not say no way out. Fail
+           open to an empty list so they land on "who's this" and can still
+           add themselves and use the tool. Same lesson as the auth-hang in
+           HANDOFF.md: "no error state" must never become a silent hang. */
+        if (!cancelled) setChildren([]);
       });
 
     return () => {
